@@ -182,7 +182,7 @@ function renderPriceTable(costImpacts) {
     const marginAtRisk = p50;
     const priceIncrease = p50 / 0.50;
     const accent = impactAccent(p50);
-    return { cat, meta, marginAtRisk, priceIncrease, accent };
+    return { cat, meta, p50, marginAtRisk, priceIncrease, accent };
   });
 
   wrap.innerHTML = `
