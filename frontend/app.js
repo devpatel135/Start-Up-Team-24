@@ -271,6 +271,12 @@ async function loadDashboard() {
     renderCategoryCards(tradeData.cost_impacts || {});
     renderKalshiFeed(tradeData.markets || []);
     updateTimestamp(tradeData.timestamp);
+    if (tradeData.simulated) {
+      const badge = document.getElementById('demo-badge');
+      const liveChip = document.getElementById('live-chip');
+      if (badge) badge.style.display = '';
+      if (liveChip) liveChip.style.display = 'none';
+    }
 
   } catch (err) {
     console.error('Trade data fetch failed:', err);

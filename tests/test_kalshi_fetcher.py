@@ -97,15 +97,24 @@ def test_lambda_handler_includes_cost_impacts():
         assert "basics" in body["cost_impacts"]
 
 
-def test_lambda_handler_missing_ssm_returns_500():
+def test_lambda_handler_missing_ssm_returns_simulated_data():
     from backend.kalshi_fetcher.handler import lambda_handler
 
     with patch("backend.kalshi_fetcher.handler.boto3") as mock_boto:
         mock_boto.client.return_value.get_parameter.side_effect = Exception("ParameterNotFound")
         resp = lambda_handler({}, {})
-        assert resp["statusCode"] == 500
+        assert resp["statusCode"] == 200
         body = json.loads(resp["body"])
-        assert "error" in body
+        assert body["simulated"] is True
+        assert len(body["markets"]) > 0
+        assert "cost_impacts" in body
+
+
+def test_simulated_markets_have_valid_prices():
+    from backend.kalshi_fetcher.handler import SIMULATED_MARKETS
+
+    for m in SIMULATED_MARKETS:
+        assert 0.0 <= m["yes_price"] <= 1.0, f"yes_price out of range for {m['id']}"
 
 
 def test_lambda_handler_has_timestamp():

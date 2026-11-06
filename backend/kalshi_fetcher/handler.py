@@ -24,6 +24,17 @@ TRADE_KEYWORDS = ["tariff", "trade", "import duty", "china", "section 301", "mfn
 
 KALSHI_API_BASE = "https://trading-api.kalshi.com/trade-api/v2"
 
+# Used when no Kalshi API key is configured — realistic probability distributions
+# based on public analyst consensus as of late 2024, not live market data.
+SIMULATED_MARKETS = [
+    {"id": "sim-section301",  "title": "Will US maintain Section 301 tariffs on apparel through 2025?",        "yes_price": 0.72, "expiry": "2025-12-31T00:00:00Z"},
+    {"id": "sim-escalation",  "title": "Will US-China trade war escalate significantly in 2025?",              "yes_price": 0.55, "expiry": "2025-12-31T00:00:00Z"},
+    {"id": "sim-shipping",    "title": "Will global container shipping costs spike 20%+ in 2025?",             "yes_price": 0.60, "expiry": "2025-12-31T00:00:00Z"},
+    {"id": "sim-60pct",       "title": "Will US impose 60%+ tariffs on Chinese imports?",                      "yes_price": 0.45, "expiry": "2025-06-30T00:00:00Z"},
+    {"id": "sim-usmca",       "title": "Will USMCA survive renegotiation without major apparel tariff changes?", "yes_price": 0.38, "expiry": "2025-09-30T00:00:00Z"},
+    {"id": "sim-eu-import",   "title": "Will US impose new import duties on EU textile goods?",                "yes_price": 0.28, "expiry": "2025-12-31T00:00:00Z"},
+]
+
 
 def compute_cost_impacts(markets: list) -> dict:
     prices = [max(0.0, min(1.0, m["yes_price"])) for m in markets if "yes_price" in m]
@@ -78,26 +89,27 @@ def lambda_handler(event, context):
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": _cors_headers(), "body": ""}
 
+    simulated = False
     try:
         ssm = boto3.client("ssm", region_name="us-east-1")
         param = ssm.get_parameter(
             Name="/trade-policy-tool/kalshi-api-key", WithDecryption=True
         )
         api_key = param["Parameter"]["Value"]
-    except Exception as e:
-        return {
-            "statusCode": 500,
-            "headers": _cors_headers(),
-            "body": json.dumps({"error": f"SSM parameter /trade-policy-tool/kalshi-api-key not found: {str(e)}"}),
-        }
+    except Exception:
+        markets = SIMULATED_MARKETS
+        simulated = True
+        api_key = None
 
     try:
-        markets = fetch_kalshi_markets(api_key)
+        if not simulated:
+            markets = fetch_kalshi_markets(api_key)
         cost_impacts = compute_cost_impacts(markets)
         payload = {
             "markets": markets,
             "cost_impacts": cost_impacts,
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "simulated": simulated,
         }
         return {
             "statusCode": 200,
