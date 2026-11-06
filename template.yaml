@@ -98,14 +98,16 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "trade-policy-tool-frontend-${AWS::AccountId}"
-      WebsiteConfiguration:
-        IndexDocument: index.html
-        ErrorDocument: index.html
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
-        BlockPublicPolicy: false
-        IgnorePublicAcls: false
-        RestrictPublicBuckets: false
+
+  # CloudFront Origin Access Control — bucket stays private, only CF can read it
+  FrontendOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: trade-policy-tool-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
 
   FrontendBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -115,9 +117,13 @@ Resources:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
-            Principal: '*'
+            Principal:
+              Service: cloudfront.amazonaws.com
             Action: s3:GetObject
             Resource: !Sub "${FrontendBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
 
   # ── CloudFront Distribution ──────────────────────────────────────────────────
   CloudFrontDistribution:
@@ -130,11 +136,10 @@ Resources:
         PriceClass: PriceClass_100
         Origins:
           - Id: S3Frontend
-            DomainName: !Sub "${FrontendBucket}.s3-website-${AWS::Region}.amazonaws.com"
-            CustomOriginConfig:
-              HTTPPort: 80
-              HTTPSPort: 443
-              OriginProtocolPolicy: http-only
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+            OriginAccessControlId: !GetAtt FrontendOAC.Id
           - Id: ApiGateway
             DomainName: !Sub "${TradeApi}.execute-api.${AWS::Region}.amazonaws.com"
             CustomOriginConfig:
