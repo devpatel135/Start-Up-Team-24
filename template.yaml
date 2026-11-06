@@ -1,0 +1,199 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Trade Policy Decision Tool - Independent deployment (stack trade-policy-tool)
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    Environment:
+      Variables:
+        POWERTOOLS_SERVICE_NAME: trade-policy-tool
+
+Resources:
+
+  # ── API Gateway ──────────────────────────────────────────────────────────────
+  TradeApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowOrigin: "'*'"
+        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key'"
+        AllowMethods: "'GET,POST,OPTIONS'"
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          ThrottlingBurstLimit: 200
+          ThrottlingRateLimit: 100
+
+  # ── Lambda: Kalshi Fetcher ───────────────────────────────────────────────────
+  KalshiFetcherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: trade-policy-kalshi-fetcher
+      CodeUri: backend/kalshi_fetcher/
+      Handler: handler.lambda_handler
+      Description: Fetches Kalshi trade policy markets and computes cost impacts
+      Policies:
+        - SSMParameterReadPolicy:
+            ParameterName: trade-policy-tool/kalshi-api-key
+        - Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+      Events:
+        TradeDataGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TradeApi
+            Path: /trade-data
+            Method: GET
+        TradeDataOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TradeApi
+            Path: /trade-data
+            Method: OPTIONS
+
+  # ── Lambda: Bedrock Analyzer ─────────────────────────────────────────────────
+  BedrockAnalyzerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: trade-policy-bedrock-analyzer
+      CodeUri: backend/bedrock_analyzer/
+      Handler: handler.lambda_handler
+      Description: Calls Claude via Bedrock to generate plain-English risk summary
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+      Events:
+        AnalyzePost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TradeApi
+            Path: /analyze
+            Method: POST
+        AnalyzeOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TradeApi
+            Path: /analyze
+            Method: OPTIONS
+
+  # ── S3 Frontend Bucket ───────────────────────────────────────────────────────
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "trade-policy-tool-frontend-${AWS::AccountId}"
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+
+  # ── CloudFront Distribution ──────────────────────────────────────────────────
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: S3Frontend
+            DomainName: !Sub "${FrontendBucket}.s3-website-${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+          - Id: ApiGateway
+            DomainName: !Sub "${TradeApi}.execute-api.${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+            OriginPath: /prod
+        DefaultCacheBehavior:
+          TargetOriginId: S3Frontend
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized
+          AllowedMethods:
+            - GET
+            - HEAD
+        CacheBehaviors:
+          - PathPattern: /trade-data*
+            TargetOriginId: ApiGateway
+            ViewerProtocolPolicy: https-only
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            ForwardedValues:
+              QueryString: false
+              Headers: []
+          - PathPattern: /analyze*
+            TargetOriginId: ApiGateway
+            ViewerProtocolPolicy: https-only
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
+            AllowedMethods:
+              - DELETE
+              - GET
+              - HEAD
+              - OPTIONS
+              - PATCH
+              - POST
+              - PUT
+            ForwardedValues:
+              QueryString: false
+              Headers:
+                - Content-Type
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+
+Outputs:
+  CloudFrontURL:
+    Description: "NEW CloudFront URL for the Trade Policy Dashboard (independent of any existing deployment)"
+    Value: !GetAtt CloudFrontDistribution.DomainName
+
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${TradeApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+
+  FrontendBucketName:
+    Description: "S3 bucket for frontend assets"
+    Value: !Ref FrontendBucket
