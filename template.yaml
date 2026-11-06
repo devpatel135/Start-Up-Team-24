@@ -4,7 +4,7 @@ Description: Trade Policy Decision Tool - Independent deployment (stack trade-po
 
 Globals:
   Function:
-    Runtime: python3.12
+    Runtime: python3.13
     Timeout: 30
     Environment:
       Variables:
