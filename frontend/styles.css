@@ -1,15 +1,17 @@
 /* ── Tokens ─────────────────────────────────────────────────────────────────── */
 :root {
-  --bg:          #f4f6fa;
+  --bg:          #f5f7ff;
   --surface:     #ffffff;
-  --surface-2:   #f0f3f9;
-  --border:      #dde3ef;
-  --border-2:    #c8d1e4;
-  --text:        #111827;
-  --text-muted:  #6b7a9b;
-  --text-dim:    #a9b5cc;
-  --accent:      #4f52e8;
-  --accent-glow: rgba(79,82,232,.12);
+  --surface-2:   #eef1ff;
+  --border:      #d0d8ff;
+  --border-2:    #b0bcff;
+  --text:        #0a0a2e;
+  --text-muted:  #5558a0;
+  --text-dim:    #9098c8;
+  --accent:      #0000ff;
+  --accent-dark: #0000cc;
+  --accent-glow: rgba(0,0,255,.09);
+  --accent-cyan: #00b4ff;
 
   --low:         #059669;
   --low-bg:      rgba(5,150,105,.10);
@@ -27,9 +29,9 @@
   --font-body:  'Inter', system-ui, -apple-system, sans-serif;
   --font-mono:  'JetBrains Mono', 'Cascadia Code', monospace;
 
-  --shadow-sm:  0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
-  --shadow:     0 4px 12px rgba(0,0,0,.10), 0 2px 4px rgba(0,0,0,.06);
-  --shadow-lg:  0 8px 32px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.08);
+  --shadow-sm:  0 1px 3px rgba(0,0,255,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow:     0 4px 16px rgba(0,0,255,.10), 0 2px 4px rgba(0,0,0,.05);
+  --shadow-lg:  0 8px 32px rgba(0,0,255,.13), 0 4px 8px rgba(0,0,0,.07);
 }
 
 /* ── Reset ──────────────────────────────────────────────────────────────────── */
@@ -1648,8 +1650,8 @@ a:hover { text-decoration: underline; }
 
 /* ── Deloitte Header ─────────────────────────────────────────────────────────── */
 .site-header--deloitte {
-  background: #001F3F;
-  border-bottom: 2px solid #86BC25;
+  background: #0000ff;
+  border-bottom: 2px solid #00b4ff;
 }
 
 .site-header--deloitte .header-inner {
@@ -1933,7 +1935,7 @@ a:hover { text-decoration: underline; }
 }
 
 .call-btn {
-  background: #001F3F;
+  background: #0000ff;
   color: #ffffff;
   border: none;
   border-radius: var(--radius-sm);
@@ -1947,7 +1949,7 @@ a:hover { text-decoration: underline; }
   letter-spacing: 0.01em;
 }
 
-.call-btn:hover { background: #002d5a; }
+.call-btn:hover { background: #0000cc; }
 
 .call-examples {
   display: flex;
@@ -2085,7 +2087,7 @@ a:hover { text-decoration: underline; }
 
 .call-result-cta {
   align-self: flex-start;
-  background: #001F3F;
+  background: #0000ff;
   color: #ffffff;
   border: none;
   border-radius: var(--radius-sm);
@@ -2096,7 +2098,138 @@ a:hover { text-decoration: underline; }
   transition: background 0.15s;
   font-family: var(--font-body);
 }
-.call-result-cta:hover { background: #002d5a; }
+.call-result-cta:hover { background: #0000cc; }
+
+/* ── Step Progress Strip ─────────────────────────────────────────────────────── */
+.step-strip {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  overflow-x: auto;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px 14px 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: border-color 0.2s;
+}
+
+.step-item:hover .step-label { color: var(--accent); }
+
+.step-item.active {
+  border-bottom-color: var(--accent);
+}
+
+.step-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.step-item.active .step-num {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.step-item.done .step-num {
+  background: var(--low);
+  border-color: var(--low);
+  color: #fff;
+}
+
+.step-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.step-label-main {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1;
+}
+
+.step-label-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.step-connector {
+  width: 32px;
+  height: 1px;
+  background: var(--border-2);
+  flex-shrink: 0;
+  margin: 0 4px;
+}
+
+/* ── Next Step CTA ───────────────────────────────────────────────────────────── */
+.next-step-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #0000ff 0%, #0044ff 100%);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-top: 24px;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  text-align: left;
+  transition: opacity 0.15s;
+}
+
+.next-step-cta:hover { opacity: 0.92; }
+
+.nsc-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nsc-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.65);
+  font-family: var(--font-mono);
+}
+
+.nsc-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.nsc-arrow {
+  font-size: 20px;
+  color: rgba(255,255,255,0.8);
+  font-weight: 300;
+}
 
 /* ── Print styles ────────────────────────────────────────────────────────────── */
 @media print {

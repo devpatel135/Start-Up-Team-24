@@ -510,6 +510,19 @@ function renderCategoryChart(costImpacts) {
   });
 }
 
+/* ── Step strip sync ─────────────────────────────────────────────────────────── */
+function syncStepStrip(activeTab) {
+  const isCommit = activeTab === 'order-commitment';
+  document.querySelectorAll('.step-item').forEach(el => el.classList.remove('active', 'done'));
+  if (isCommit) {
+    document.getElementById('step-1')?.classList.add('done');
+    document.getElementById('step-2')?.classList.add('done');
+    document.getElementById('step-3')?.classList.add('active');
+  } else {
+    document.getElementById('step-1')?.classList.add('active');
+  }
+}
+
 /* ── Tab switching ───────────────────────────────────────────────────────────── */
 function initTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -521,6 +534,15 @@ function initTabs() {
       const panel = document.getElementById('tab-' + target);
       if (panel) panel.classList.add('active');
       if (target === 'order-commitment') updateOrderCommitmentResults();
+      syncStepStrip(target);
+    });
+  });
+  // wire step strip clicks
+  document.querySelectorAll('.step-item[data-tab]').forEach(el => {
+    el.addEventListener('click', () => {
+      const tab = el.dataset.tab;
+      const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+      if (btn) btn.click();
     });
   });
 }
