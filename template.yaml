@@ -27,18 +27,25 @@ Resources:
           ThrottlingBurstLimit: 200
           ThrottlingRateLimit: 100
 
-  # ── Lambda: Kalshi Fetcher ───────────────────────────────────────────────────
-  KalshiFetcherFunction:
+  # ── Lambda: Policy Predictor ─────────────────────────────────────────────────
+  PolicyPredictorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: trade-policy-kalshi-fetcher
-      CodeUri: backend/kalshi_fetcher/
+      FunctionName: trade-policy-predictor
+      CodeUri: backend/policy_predictor/
       Handler: handler.lambda_handler
-      Description: Fetches Kalshi trade policy markets and computes cost impacts
+      Timeout: 60
+      Description: LLM-driven trade policy predictions via Bedrock + optional NewsAPI
       Policies:
-        - SSMParameterReadPolicy:
-            ParameterName: trade-policy-tool/kalshi-api-key
         - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/trade-policy-tool/newsapi-key"
             - Effect: Allow
               Action:
                 - logs:CreateLogGroup
@@ -66,7 +73,8 @@ Resources:
       FunctionName: trade-policy-bedrock-analyzer
       CodeUri: backend/bedrock_analyzer/
       Handler: handler.lambda_handler
-      Description: Calls Claude via Bedrock to generate plain-English risk summary
+      Timeout: 60
+      Description: Calls Claude via Bedrock to generate risk summary and recommendations
       Policies:
         - Statement:
             - Effect: Allow

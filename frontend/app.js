@@ -3,7 +3,7 @@
 /* ── Config ─────────────────────────────────────────────────────────────────── */
 const API_BASE = (typeof window !== 'undefined' && window.API_BASE) ? window.API_BASE : '';
 
-/* ── SVG icon paths per category ────────────────────────────────────────────── */
+/* ── Category metadata ───────────────────────────────────────────────────────── */
 const CATEGORY_META = {
   basics:      { label: 'Basics',      sourcing: '72% China-sourced', icon: '<path d="M4 7l8-4 8 4v2l-2 1v7a1 1 0 01-1 1H7a1 1 0 01-1-1v-7L4 9V7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>' },
   denim:       { label: 'Denim',       sourcing: '45% China-sourced', icon: '<path d="M5 4h14l-2 7H7L5 4z M7 11l1 9M17 11l-1 9M8 20h8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>' },
@@ -13,8 +13,7 @@ const CATEGORY_META = {
   activewear:  { label: 'Activewear',  sourcing: '55% China-sourced', icon: '<path d="M13 3l5 9H6l5-9M11 12v9M13 12v9M9 21h6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>' },
 };
 
-/* ── Gauge arc (270°, clockwise from bottom-left) ───────────────────────────── */
-const GAUGE_ARC_LENGTH = 219; // length of the 270° arc path in SVG units
+const GAUGE_ARC_LENGTH = 219;
 
 const RISK_CONFIG = {
   low:      { fill: 0.25, color: '#10b981', label: 'Low'      },
@@ -24,17 +23,18 @@ const RISK_CONFIG = {
   unknown:  { fill: 0,    color: '#3a4a68', label: '—'        },
 };
 
-/* ── Utilities ──────────────────────────────────────────────────────────────── */
-function impactColor(pct) {
-  if (pct < 0.02) return 'var(--low)';
-  if (pct < 0.05) return 'var(--moderate)';
-  return 'var(--high)';
-}
+/* ── Module-level state for price tool ──────────────────────────────────────── */
+let _costImpacts = null;
+let _predictions = null;
 
-function impactAccent(pct) {
-  if (pct < 0.02) return 'var(--low)';
-  if (pct < 0.05) return 'var(--moderate)';
-  return 'var(--high)';
+/* ── Utilities ──────────────────────────────────────────────────────────────── */
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function fmt(pct) {
@@ -42,13 +42,14 @@ function fmt(pct) {
   return (pct * 100).toFixed(1) + '%';
 }
 
-function daysUntil(isoStr) {
-  if (!isoStr) return '—';
-  const diff = new Date(isoStr) - Date.now();
-  const days = Math.round(diff / 86400000);
-  if (days < 0) return 'Expired';
-  if (days === 0) return 'Today';
-  return days + 'd';
+function impactColor(pct) {
+  if (pct < 0.02) return 'var(--low)';
+  if (pct < 0.05) return 'var(--moderate)';
+  return 'var(--high)';
+}
+
+function fmtMoney(n) {
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtTimestamp(iso) {
@@ -61,11 +62,25 @@ function fmtTimestamp(iso) {
   } catch { return iso; }
 }
 
-/* ── Render: Risk Gauge ─────────────────────────────────────────────────────── */
+/* ── Tab switching ───────────────────────────────────────────────────────────── */
+function initTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const panel = document.getElementById('tab-' + target);
+      if (panel) panel.classList.add('active');
+      if (target === 'price-tool') updatePriceToolResults();
+    });
+  });
+}
+
+/* ── Render: Risk Gauge ──────────────────────────────────────────────────────── */
 function updateRiskMeter(riskLevel) {
   const cfg = RISK_CONFIG[riskLevel] || RISK_CONFIG.unknown;
   const fillLen = GAUGE_ARC_LENGTH * cfg.fill;
-
   const fill = document.getElementById('gauge-fill');
   const label = document.getElementById('gauge-level');
   if (fill) {
@@ -76,14 +91,12 @@ function updateRiskMeter(riskLevel) {
     label.textContent = cfg.label;
     label.style.fill = cfg.color;
   }
-
-  // Highlight matching legend chip
   document.querySelectorAll('.legend-item').forEach(el => {
     el.style.opacity = el.classList.contains(`legend-item--${riskLevel}`) ? '1' : '0.3';
   });
 }
 
-/* ── Render: Category Cards ─────────────────────────────────────────────────── */
+/* ── Render: Category Cards ──────────────────────────────────────────────────── */
 function renderCategoryCards(costImpacts) {
   const grid = document.getElementById('category-grid');
   if (!grid) return;
@@ -92,8 +105,8 @@ function renderCategoryCards(costImpacts) {
   for (const [cat, meta] of Object.entries(CATEGORY_META)) {
     const impacts = costImpacts[cat] || { p10: 0, p50: 0, p90: 0 };
     const p50 = impacts.p50 || 0;
-    const accent = impactAccent(p50);
-    const maxPct = Math.max(impacts.p90 || 0, 0.08); // scale bars to max 8% or actual
+    const accent = impactColor(p50);
+    const maxPct = Math.max(impacts.p90 || 0, 0.08);
 
     const card = document.createElement('div');
     card.className = 'category-card';
@@ -105,8 +118,8 @@ function renderCategoryCards(costImpacts) {
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${meta.icon}</svg>
         </div>
         <div>
-          <div class="card-name">${meta.label}</div>
-          <div class="card-sourcing">${meta.sourcing}</div>
+          <div class="card-name">${escapeHtml(meta.label)}</div>
+          <div class="card-sourcing">${escapeHtml(meta.sourcing)}</div>
         </div>
       </div>
       <div class="impact-rows">
@@ -118,7 +131,7 @@ function renderCategoryCards(costImpacts) {
             <div class="impact-row">
               <span class="impact-label">${scenario.toUpperCase()}</span>
               <div class="impact-bar">
-                <div class="impact-bar-fill" style="width:${barWidth}%; --bar-color:${color}"></div>
+                <div class="impact-bar-fill" style="width:${barWidth}%;--bar-color:${color}"></div>
               </div>
               <span class="impact-pct" style="--pct-color:${color}">${fmt(val)}</span>
             </div>`;
@@ -129,94 +142,211 @@ function renderCategoryCards(costImpacts) {
   }
 }
 
-/* ── Render: Kalshi Feed ────────────────────────────────────────────────────── */
-function renderKalshiFeed(markets) {
-  const list = document.getElementById('market-list');
-  const note = document.getElementById('market-note');
-  if (!list) return;
-  list.innerHTML = '';
+/* ── Render: Predictions Panel ───────────────────────────────────────────────── */
+function renderPredictionsPanel(predictions, newsHeadlines, hasLiveNews) {
+  const panel = document.getElementById('predictions-panel');
+  if (!panel) return;
 
-  if (!markets || markets.length === 0) {
-    list.innerHTML = '<div class="market-empty">No trade-related markets found on Kalshi at this time.</div>';
-    if (note) note.textContent = 'Markets refresh on page load.';
-    return;
-  }
+  const probs = predictions.scenario_probs || {};
+  const deltas = predictions.scenario_tariff_deltas || {};
+  const reasoning = predictions.reasoning || '';
 
-  markets.slice(0, 8).forEach(market => {
-    const prob = typeof market.yes_price === 'number' ? market.yes_price : 0.5;
-    const probPct = Math.round(prob * 100);
-    const days = daysUntil(market.expiry);
+  const scenarios = [
+    { key: 'p10', label: 'Optimistic (P10)', color: 'var(--low)' },
+    { key: 'p50', label: 'Moderate (P50)',   color: 'var(--moderate)' },
+    { key: 'p90', label: 'Severe (P90)',     color: 'var(--high)' },
+  ];
 
-    const item = document.createElement('div');
-    item.className = 'market-item';
-    item.innerHTML = `
-      <div class="market-title">${escapeHtml(market.title || market.id)}</div>
-      <div class="market-meta">
-        <span class="market-prob">${probPct}% <span style="font-size:10px;color:var(--text-muted)">YES</span></span>
-        <span class="market-expiry">Expires in ${days}</span>
-      </div>
-      <div class="prob-track">
-        <div class="prob-fill" style="width:${probPct}%"></div>
+  let html = '<div class="scenario-rows">';
+  for (const s of scenarios) {
+    const prob = probs[s.key] || 0;
+    const pct = Math.round(prob * 100);
+    const delta = (deltas[s.key] || 0) * 100;
+    html += `
+      <div class="scenario-row">
+        <div class="scenario-label">
+          <span>${escapeHtml(s.label)}</span>
+          <span class="scenario-delta" style="color:${s.color}">+${delta.toFixed(0)}pp</span>
+        </div>
+        <div class="scenario-track">
+          <div class="scenario-fill" style="width:${pct}%;background:${s.color}"></div>
+        </div>
+        <span class="scenario-prob" style="color:${s.color}">${pct}%</span>
       </div>`;
-    list.appendChild(item);
-  });
+  }
+  html += '</div>';
 
-  if (note) {
-    note.textContent = `${markets.length} market${markets.length !== 1 ? 's' : ''} matched · refreshes on reload`;
+  if (reasoning) {
+    html += `<p class="reasoning-text">${escapeHtml(reasoning)}</p>`;
   }
 
-  // Live indicator
+  if (hasLiveNews && newsHeadlines && newsHeadlines.length > 0) {
+    html += '<div class="news-list"><p class="news-label">Live News Inputs</p>';
+    newsHeadlines.slice(0, 5).forEach(h => {
+      html += `<div class="news-item">
+        <span class="news-source">${escapeHtml(h.source || '')}</span>
+        <span class="news-title">${escapeHtml(h.title || '')}</span>
+      </div>`;
+    });
+    html += '</div>';
+  } else {
+    html += '<p class="news-label news-label--dim">Reasoning from historical data · no live feed</p>';
+  }
+
+  panel.innerHTML = html;
+
+  // Mark live dot
   const dot = document.getElementById('live-dot');
   if (dot) dot.classList.add('live');
 }
 
-/* ── Render: Price Impact Table ─────────────────────────────────────────────── */
-function renderPriceTable(costImpacts) {
-  const wrap = document.getElementById('price-table-wrap');
-  if (!wrap) return;
+/* ── Render: Recommendations ─────────────────────────────────────────────────── */
+function renderRecommendations(recommendations) {
+  const panel = document.getElementById('recommendations-panel');
+  if (!panel || !recommendations || !recommendations.length) return;
 
-  const rows = Object.entries(CATEGORY_META).map(([cat, meta]) => {
-    const p50 = (costImpacts[cat] || {}).p50 || 0;
-    // If absorbed: margin erosion = p50 impact directly
-    // If passed through: price increase = p50 / (1 - margin); assume 50% retail margin
-    const marginAtRisk = p50;
-    const priceIncrease = p50 / 0.50;
-    const accent = impactAccent(p50);
-    return { cat, meta, p50, marginAtRisk, priceIncrease, accent };
-  });
+  panel.innerHTML = `<ol class="recommendations-list">${
+    recommendations.map(r => `<li class="rec-item">${escapeHtml(r)}</li>`).join('')
+  }</ol>`;
+}
+
+/* ── Render: Policy Tracker ──────────────────────────────────────────────────── */
+function renderPolicyTracker(policyStatus) {
+  const wrap = document.getElementById('policy-table-wrap');
+  if (!wrap || !policyStatus) return;
+
+  const directionClass = {
+    escalating:    'direction--escalating',
+    'de-escalating': 'direction--deescalating',
+    stable:        'direction--stable',
+    uncertain:     'direction--uncertain',
+  };
+  const riskClass = {
+    low: 'risk--low', moderate: 'risk--moderate', high: 'risk--high', severe: 'risk--severe',
+  };
 
   wrap.innerHTML = `
-    <table class="price-table" role="table">
+    <div class="policy-table-scroll">
+    <table class="policy-table" role="table">
       <thead>
         <tr>
-          <th scope="col">Category</th>
-          <th scope="col">P50 Cost Impact</th>
-          <th scope="col">Margin at Risk</th>
-          <th scope="col">Price ↑ to Pass Through</th>
+          <th scope="col">Policy</th>
+          <th scope="col">Status</th>
+          <th scope="col">Direction</th>
+          <th scope="col">Risk</th>
+          <th scope="col">Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${policyStatus.map(p => `
+          <tr>
+            <td class="policy-name">${escapeHtml(p.name || '')}</td>
+            <td><span class="status-tag">${escapeHtml(p.status || '')}</span></td>
+            <td><span class="direction-pill ${directionClass[p.direction] || ''}">${escapeHtml(p.direction || '')}</span></td>
+            <td><span class="risk-pill ${riskClass[p.risk] || ''}">${escapeHtml(p.risk || '')}</span></td>
+            <td class="policy-note">${escapeHtml(p.note || '')}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>`;
+}
+
+/* ── Render: Alerts ──────────────────────────────────────────────────────────── */
+function renderAlerts(alerts) {
+  const list = document.getElementById('alerts-list');
+  if (!list || !alerts) return;
+
+  const icon = { critical: '🔴', warning: '🟡', info: '🔵' };
+  const cls  = { critical: 'alert-card--critical', warning: 'alert-card--warning', info: 'alert-card--info' };
+
+  list.innerHTML = alerts.map(a => `
+    <div class="alert-card ${cls[a.severity] || ''}">
+      <div class="alert-header">
+        <span class="alert-icon">${icon[a.severity] || '🔵'}</span>
+        <strong class="alert-title">${escapeHtml(a.title || '')}</strong>
+        <span class="alert-category">${escapeHtml(a.category || '')}</span>
+      </div>
+      <p class="alert-detail">${escapeHtml(a.detail || '')}</p>
+    </div>`).join('');
+
+  // Update badge
+  const badge = document.getElementById('alert-badge');
+  const critical = alerts.filter(a => a.severity === 'critical').length;
+  if (badge) {
+    badge.textContent = critical > 0 ? critical : alerts.length;
+    badge.style.display = alerts.length > 0 ? '' : 'none';
+    badge.className = 'alert-badge' + (critical > 0 ? ' alert-badge--critical' : '');
+  }
+}
+
+/* ── Render: Price Tool ──────────────────────────────────────────────────────── */
+function renderPriceTool(costImpacts, predictions) {
+  _costImpacts = costImpacts;
+  _predictions = predictions;
+  updatePriceToolResults();
+}
+
+function updatePriceToolResults() {
+  const resultsEl = document.getElementById('pt-results');
+  if (!resultsEl) return;
+
+  if (!_costImpacts || !_predictions) {
+    resultsEl.innerHTML = '<p class="pt-baseline">Load dashboard data first.</p>';
+    return;
+  }
+
+  const cat     = document.getElementById('pt-category')?.value || 'basics';
+  const units   = parseFloat(document.getElementById('pt-units')?.value) || 500;
+  const unitCost = parseFloat(document.getElementById('pt-cost')?.value) || 18;
+  const margin  = parseFloat(document.getElementById('pt-margin')?.value) / 100 || 0.5;
+
+  const impacts = _costImpacts[cat] || { p10: 0, p50: 0, p90: 0 };
+  const currentRetail = unitCost / (1 - margin);
+
+  const rows = ['p10', 'p50', 'p90'].map(s => {
+    const impact = impacts[s] || 0;
+    const addedCostPerUnit  = unitCost * impact;
+    const newUnitCost       = unitCost + addedCostPerUnit;
+    const totalAddedCost    = units * addedCostPerUnit;
+    const newRetail         = newUnitCost / (1 - margin);
+    const priceIncrease     = newRetail - currentRetail;
+    const label = { p10: 'Optimistic', p50: 'Moderate', p90: 'Severe' }[s];
+    const color = { p10: 'var(--low)', p50: 'var(--moderate)', p90: 'var(--high)' }[s];
+    return { s, label, color, addedCostPerUnit, totalAddedCost, newRetail, priceIncrease, impact };
+  });
+
+  resultsEl.innerHTML = `
+    <div class="pt-baseline-row">
+      <span>Current unit cost: <strong>${fmtMoney(unitCost)}</strong></span>
+      <span>Current retail: <strong>${fmtMoney(currentRetail)}</strong></span>
+      <span>Order size: <strong>${units.toLocaleString()} units</strong></span>
+    </div>
+    <table class="pt-results-table" role="table">
+      <thead>
+        <tr>
+          <th scope="col">Scenario</th>
+          <th scope="col">Cost Impact</th>
+          <th scope="col">Added Cost/Unit</th>
+          <th scope="col">Total Added Cost</th>
+          <th scope="col">New Retail</th>
+          <th scope="col">Price Increase</th>
         </tr>
       </thead>
       <tbody>
         ${rows.map(r => `
           <tr>
-            <td>
-              <div class="td-category">
-                <span class="td-dot" style="background:${r.accent}"></span>
-                ${r.meta.label}
-              </div>
-            </td>
-            <td class="td-number" style="color:${r.accent}">${fmt(r.p50 || 0)}</td>
-            <td class="td-number at-risk">${fmt(r.marginAtRisk)}</td>
-            <td class="td-number pass-through">${fmt(r.priceIncrease)}</td>
+            <td style="color:${r.color};font-weight:600">${escapeHtml(r.label)}</td>
+            <td style="color:${r.color}">${fmt(r.impact)}</td>
+            <td>${fmtMoney(r.addedCostPerUnit)}</td>
+            <td style="color:${r.color};font-weight:600">${fmtMoney(r.totalAddedCost)}</td>
+            <td>${fmtMoney(r.newRetail)}</td>
+            <td style="color:${r.color}">${fmtMoney(r.priceIncrease)}</td>
           </tr>`).join('')}
       </tbody>
     </table>`;
-
-  function fmt(v) {
-    return (v === undefined || v === null) ? '—' : (v * 100).toFixed(1) + '%';
-  }
 }
 
-/* ── Render: LLM Summary ────────────────────────────────────────────────────── */
+/* ── Render: Summary ─────────────────────────────────────────────────────────── */
 function renderSummary(summaryText) {
   const el = document.getElementById('llm-summary');
   if (!el) return;
@@ -224,30 +354,17 @@ function renderSummary(summaryText) {
     el.innerHTML = '<p class="error-state">No summary available.</p>';
     return;
   }
-
-  // Split on double newline for two paragraphs
   const paragraphs = summaryText.split(/\n\n+/).filter(Boolean);
   el.innerHTML = paragraphs.map(p => `<p>${escapeHtml(p.trim())}</p>`).join('');
 }
 
-/* ── XSS safety ─────────────────────────────────────────────────────────────── */
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/* ── Error state ────────────────────────────────────────────────────────────── */
+/* ── Utilities ───────────────────────────────────────────────────────────────── */
 function showError(section, message) {
   const el = document.getElementById(section);
   if (!el) return;
-  el.innerHTML = `<div class="error-state"><strong>Unable to load data</strong>${escapeHtml(message)}</div>`;
+  el.innerHTML = `<div class="error-state"><strong>Unable to load data</strong> — ${escapeHtml(message)}</div>`;
 }
 
-/* ── Timestamp ──────────────────────────────────────────────────────────────── */
 function updateTimestamp(iso) {
   const el = document.getElementById('last-updated');
   const ft = document.getElementById('footer-ts');
@@ -256,11 +373,11 @@ function updateTimestamp(iso) {
   if (ft) ft.textContent = formatted;
 }
 
-/* ── Main data flow ─────────────────────────────────────────────────────────── */
+/* ── Main data flow ──────────────────────────────────────────────────────────── */
 async function loadDashboard() {
   let tradeData = null;
 
-  // ── Step 1: Fetch trade data (Kalshi + cost model) ────────────────────────
+  // ── Step 1: Fetch predictions from policy_predictor Lambda ───────────────
   try {
     const resp = await fetch(`${API_BASE}/trade-data`, {
       headers: { 'Accept': 'application/json' },
@@ -269,28 +386,32 @@ async function loadDashboard() {
     tradeData = await resp.json();
 
     renderCategoryCards(tradeData.cost_impacts || {});
-    renderKalshiFeed(tradeData.markets || []);
+    renderPolicyTracker(tradeData.policy_status || []);
+    renderAlerts(tradeData.alerts || []);
+    renderPriceTool(tradeData.cost_impacts || {}, tradeData.predictions || {});
+    renderPredictionsPanel(
+      tradeData.predictions || {},
+      tradeData.news_headlines || [],
+      tradeData.has_live_news || false
+    );
     updateTimestamp(tradeData.timestamp);
-    if (tradeData.simulated) {
-      const badge = document.getElementById('demo-badge');
-      const liveChip = document.getElementById('live-chip');
-      if (badge) badge.style.display = '';
-      if (liveChip) liveChip.style.display = 'none';
-    }
 
   } catch (err) {
     console.error('Trade data fetch failed:', err);
-    showError('category-grid', 'Could not reach the trade data service. Check API endpoint.');
-    showError('market-list', 'Kalshi market data unavailable.');
-    renderCategoryCards({});
+    showError('category-grid', 'Could not reach the trade data service.');
+    showError('predictions-panel', 'Trade data unavailable.');
     updateTimestamp(null);
   }
 
-  // ── Step 2: LLM analysis via Bedrock ─────────────────────────────────────
+  // ── Step 2: LLM analysis via Bedrock Analyzer ────────────────────────────
   try {
     const body = tradeData
-      ? { markets: tradeData.markets || [], cost_impacts: tradeData.cost_impacts || {} }
-      : { markets: [], cost_impacts: {} };
+      ? {
+          predictions: tradeData.predictions || {},
+          cost_impacts: tradeData.cost_impacts || {},
+          alerts: tradeData.alerts || [],
+        }
+      : { predictions: {}, cost_impacts: {}, alerts: [] };
 
     const analyzeResp = await fetch(`${API_BASE}/analyze`, {
       method: 'POST',
@@ -302,15 +423,26 @@ async function loadDashboard() {
 
     renderSummary(analyzeData.summary);
     updateRiskMeter(analyzeData.risk_level || 'unknown');
-    if (tradeData) renderPriceTable(tradeData.cost_impacts || {});
+    renderRecommendations(analyzeData.recommendations || []);
 
   } catch (err) {
     console.error('Analysis fetch failed:', err);
-    showError('llm-summary', 'AI analysis unavailable. Review Kalshi market data directly.');
+    showError('llm-summary', 'AI analysis unavailable.');
     updateRiskMeter('unknown');
-    if (tradeData) renderPriceTable(tradeData.cost_impacts || {});
   }
 }
 
-/* ── Boot ───────────────────────────────────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', loadDashboard);
+/* ── Price tool live inputs ──────────────────────────────────────────────────── */
+function initPriceToolListeners() {
+  ['pt-category', 'pt-units', 'pt-cost', 'pt-margin'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', updatePriceToolResults);
+  });
+}
+
+/* ── Boot ────────────────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  initTabs();
+  initPriceToolListeners();
+  loadDashboard();
+});
