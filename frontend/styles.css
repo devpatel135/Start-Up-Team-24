@@ -1,17 +1,18 @@
 /* ── Tokens ─────────────────────────────────────────────────────────────────── */
 :root {
-  --bg:          #f5f7ff;
+  --bg:          #faf7f4;
   --surface:     #ffffff;
-  --surface-2:   #eef1ff;
-  --border:      #d0d8ff;
-  --border-2:    #b0bcff;
-  --text:        #0a0a2e;
-  --text-muted:  #5558a0;
-  --text-dim:    #9098c8;
-  --accent:      #0000ff;
-  --accent-dark: #0000cc;
-  --accent-glow: rgba(0,0,255,.09);
-  --accent-cyan: #00b4ff;
+  --surface-2:   #f5f0e8;
+  --border:      #e8ddd0;
+  --border-2:    #d4c8b8;
+  --text:        #1a2744;
+  --text-muted:  #6a7090;
+  --text-dim:    #9aa0b8;
+  --accent:      #e8614a;
+  --accent-dark: #c94d38;
+  --accent-glow: rgba(232,97,74,.10);
+  --navy:        #1a2744;
+  --creme:       #faf7f4;
 
   --low:         #059669;
   --low-bg:      rgba(5,150,105,.10);
@@ -29,9 +30,9 @@
   --font-body:  'Inter', system-ui, -apple-system, sans-serif;
   --font-mono:  'JetBrains Mono', 'Cascadia Code', monospace;
 
-  --shadow-sm:  0 1px 3px rgba(0,0,255,.06), 0 1px 2px rgba(0,0,0,.04);
-  --shadow:     0 4px 16px rgba(0,0,255,.10), 0 2px 4px rgba(0,0,0,.05);
-  --shadow-lg:  0 8px 32px rgba(0,0,255,.13), 0 4px 8px rgba(0,0,0,.07);
+  --shadow-sm:  0 1px 3px rgba(26,39,68,.07), 0 1px 2px rgba(0,0,0,.04);
+  --shadow:     0 4px 16px rgba(26,39,68,.10), 0 2px 4px rgba(0,0,0,.05);
+  --shadow-lg:  0 8px 32px rgba(26,39,68,.13), 0 4px 8px rgba(0,0,0,.07);
 }
 
 /* ── Reset ──────────────────────────────────────────────────────────────────── */
@@ -1650,8 +1651,8 @@ a:hover { text-decoration: underline; }
 
 /* ── Deloitte Header ─────────────────────────────────────────────────────────── */
 .site-header--deloitte {
-  background: #0000ff;
-  border-bottom: 2px solid #00b4ff;
+  background: #1a2744;
+  border-bottom: 2px solid #e8614a;
 }
 
 .site-header--deloitte .header-inner {
@@ -1935,7 +1936,7 @@ a:hover { text-decoration: underline; }
 }
 
 .call-btn {
-  background: #0000ff;
+  background: #e8614a;
   color: #ffffff;
   border: none;
   border-radius: var(--radius-sm);
@@ -1949,7 +1950,7 @@ a:hover { text-decoration: underline; }
   letter-spacing: 0.01em;
 }
 
-.call-btn:hover { background: #0000cc; }
+.call-btn:hover { background: #c94d38; }
 
 .call-examples {
   display: flex;
@@ -2087,7 +2088,7 @@ a:hover { text-decoration: underline; }
 
 .call-result-cta {
   align-self: flex-start;
-  background: #0000ff;
+  background: #e8614a;
   color: #ffffff;
   border: none;
   border-radius: var(--radius-sm);
@@ -2098,7 +2099,7 @@ a:hover { text-decoration: underline; }
   transition: background 0.15s;
   font-family: var(--font-body);
 }
-.call-result-cta:hover { background: #0000cc; }
+.call-result-cta:hover { background: #c94d38; }
 
 /* ── Step Progress Strip ─────────────────────────────────────────────────────── */
 .step-strip {
@@ -2191,7 +2192,7 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(135deg, #0000ff 0%, #0044ff 100%);
+  background: linear-gradient(135deg, #1a2744 0%, #2a3d6a 100%);
   border-radius: var(--radius);
   padding: 16px 20px;
   margin-top: 24px;
