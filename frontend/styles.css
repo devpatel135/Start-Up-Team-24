@@ -35,6 +35,12 @@
 /* ── Reset ──────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* SVGs without explicit width/height default to 300×150 — cap them */
+svg:not([width]):not([height]):not(.risk-gauge):not(.brand-icon):not(.banner-cal-icon) {
+  max-width: 100%;
+  height: auto;
+}
+
 html {
   color-scheme: light;
   scroll-behavior: smooth;
@@ -1060,6 +1066,8 @@ a:hover { text-decoration: underline; }
 }
 
 .banner-cal-icon {
+  width: 20px;
+  height: 20px;
   color: var(--text-muted);
   flex-shrink: 0;
 }
