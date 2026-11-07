@@ -180,6 +180,203 @@ function generateFallbackAnalysis(predictions, costImpacts) {
   return `${para1}\n\n${para2}`;
 }
 
+/* ── Kalshi: Featured Contracts ─────────────────────────────────────────────── */
+function renderFeaturedContracts(predictions, costImpacts) {
+  const grid = document.getElementById('contracts-grid');
+  if (!grid) return;
+
+  const probs  = (predictions || {}).scenario_probs         || { p10: 0.20, p50: 0.55, p90: 0.25 };
+  const deltas = (predictions || {}).scenario_tariff_deltas || { p10: 0.0,  p50: 0.145, p90: 0.42 };
+
+  const contracts = [
+    {
+      id: 'p10', title: 'China tariffs de-escalate before Spring 2027',
+      subtitle: 'Optimistic (P10)', color: 'green',
+      prob: Math.round((probs.p10 || 0.20) * 100),
+      delta: ((deltas.p10 || 0) * 100).toFixed(0), volume: '2.1K',
+    },
+    {
+      id: 'p50', title: 'Tariffs persist at moderate elevated levels',
+      subtitle: 'Moderate (P50) · Base Case', color: 'amber',
+      prob: Math.round((probs.p50 || 0.55) * 100),
+      delta: ((deltas.p50 || 0.145) * 100).toFixed(0), volume: '8.4K',
+    },
+    {
+      id: 'p90', title: 'Full tariff escalation — severe scenario',
+      subtitle: 'Severe (P90) · Stress Case', color: 'red',
+      prob: Math.round((probs.p90 || 0.25) * 100),
+      delta: ((deltas.p90 || 0.42) * 100).toFixed(0), volume: '3.7K',
+    },
+  ];
+
+  const palette = {
+    green: { yes: '#059669', yesBg: 'rgba(5,150,105,.12)', no: '#e11d48', noBg: 'rgba(225,29,72,.10)', bar: '#059669' },
+    amber: { yes: '#d97706', yesBg: 'rgba(217,119,6,.12)', no: '#3b82f6', noBg: 'rgba(59,130,246,.10)', bar: '#d97706' },
+    red:   { yes: '#e11d48', yesBg: 'rgba(225,29,72,.12)', no: '#059669', noBg: 'rgba(5,150,105,.10)', bar: '#e11d48' },
+  };
+
+  grid.innerHTML = contracts.map(c => {
+    const cl = palette[c.color] || palette.amber;
+    const yp = c.prob, np = 100 - c.prob;
+    return `
+      <div class="contract-card contract-card--${escapeHtml(c.color)}">
+        <div class="contract-meta">
+          <span class="contract-subtitle">${escapeHtml(c.subtitle)}</span>
+          <span class="contract-delta">+${escapeHtml(c.delta)}pp tariff</span>
+        </div>
+        <div class="contract-title">${escapeHtml(c.title)}</div>
+        <div class="contract-prob-track">
+          <div class="contract-prob-fill" style="width:${yp}%;background:${cl.bar}"></div>
+        </div>
+        <div class="contract-prices">
+          <div class="contract-price-side" style="background:${cl.yesBg};color:${cl.yes}">
+            <span class="cps-label">YES</span>
+            <span class="cps-val">${yp}¢</span>
+          </div>
+          <div class="contract-price-mid">
+            <div class="cpm-prob" style="color:${cl.bar}">${yp}%</div>
+            <div class="cpm-vol">${escapeHtml(c.volume)} vol</div>
+          </div>
+          <div class="contract-price-side" style="background:${cl.noBg};color:${cl.no}">
+            <span class="cps-label">NO</span>
+            <span class="cps-val">${np}¢</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ── Kalshi: Contract Call ───────────────────────────────────────────────────── */
+function analyzeContractCall(inputText) {
+  if (!_costImpacts || !_predictions) {
+    showToast('Load dashboard data first to enable contract analysis', 'warn');
+    return null;
+  }
+
+  const text = inputText.toLowerCase();
+  const probs = (_predictions.scenario_probs || { p10: 0.20, p50: 0.55, p90: 0.25 });
+
+  let category = null;
+  for (const [cat, meta] of Object.entries(CATEGORY_META)) {
+    if (text.includes(cat) || text.includes(meta.label.toLowerCase())) { category = cat; break; }
+  }
+
+  const isBullish = /below|drop|reduc|fall|de-escal|cut|lower|decreas/.test(text);
+  const isBearish = /above|exceed|escal|rise|increas|spike|surge|high|worst|severe/.test(text);
+  const isVietnam  = /vietnam|viet/.test(text);
+  const isBangladesh = /bangladesh/.test(text);
+  const isMexico   = /mexico|usmca/.test(text);
+
+  let probability, scenarioKey;
+  if (isMexico) {
+    probability = 92; scenarioKey = 'p10';
+  } else if (isBullish) {
+    probability = Math.round((probs.p10 || 0.20) * 100); scenarioKey = 'p10';
+  } else if (isBearish) {
+    probability = Math.min(85, Math.round(((probs.p50 || 0.55) + (probs.p90 || 0.25)) * 100)); scenarioKey = 'p90';
+  } else if (isVietnam) {
+    probability = 72; scenarioKey = 'p50';
+  } else if (isBangladesh) {
+    probability = 68; scenarioKey = 'p50';
+  } else {
+    probability = Math.round((probs.p50 || 0.55) * 100); scenarioKey = 'p50';
+  }
+
+  const cat = category || 'basics';
+  const impacts = (_costImpacts[cat] || { p10: 0, p50: 0, p90: 0 });
+  const impact = impacts[scenarioKey] || impacts.p50 || 0;
+  const margin = 0.5;
+  const marginErosion = (impact * (1 - margin) * 100).toFixed(1);
+  const totalAddedCost = (500 * 18 * impact).toFixed(0);
+  const categoryLabel = CATEGORY_META[cat]?.label || cat;
+  const yesPrice = probability, noPrice = 100 - probability;
+
+  let impliedRisk;
+  if (probability >= 75) impliedRisk = 'severe';
+  else if (probability >= 50) impliedRisk = 'high';
+  else if (probability >= 30) impliedRisk = 'moderate';
+  else impliedRisk = 'low';
+
+  let analysis;
+  if (isMexico) {
+    analysis = `Mexico (USMCA) carries a ${probability}% probability of tariff exemption through Spring 2027 — the only fully-exempt origin. At $0 tariff impact, this is the lowest-risk sourcing pivot available to buyers today, though capacity constraints (Low-Med) limit scalability across all categories.`;
+  } else if (isBullish) {
+    analysis = `De-escalation has only a ${probability}% probability given current trade policy trajectory. If this materializes, ${categoryLabel} margin erosion would be near-zero. The market is pricing this as the tail-optimistic scenario — do not model it as a base case without a verifiable policy catalyst.`;
+  } else if (isBearish) {
+    analysis = `Tariff escalation / persistence probability: ${probability}%. At this scenario, ${categoryLabel} faces ${marginErosion}pp margin erosion at a 50% retail margin. Recommend building cost-escalation provisions into Spring 2027 purchase orders and modeling Vietnam / Bangladesh alternatives now.`;
+  } else if (isVietnam) {
+    analysis = `Vietnam pause expiry carries ${probability}% probability before Spring 2027 orders land at port. If rates revert from 10% to 46%, buyers reliant on Vietnamese supply face a step-change in cost. Recommend dual-scenario modeling — with and without pause extension — before PO commitment.`;
+  } else {
+    analysis = `Moderate tariff persistence has ${probability}% probability — the AI base case. ${categoryLabel} faces ${marginErosion}pp margin erosion at a 50% retail margin. Treat P50 as the planning baseline. P90 (25%) represents the institutional stress case that should inform purchase order provisions.`;
+  }
+
+  return { probability, yesPrice, noPrice, impliedRisk, category: cat, categoryLabel, marginErosion, analysis, totalAddedCost };
+}
+
+function renderCallResult(result, inputText) {
+  const el = document.getElementById('call-result');
+  if (!el || !result) return;
+  const riskCfg = RISK_CONFIG[result.impliedRisk] || RISK_CONFIG.moderate;
+  const riskColors = { severe: '#dc2626', high: '#e11d48', moderate: '#d97706', low: '#059669', unknown: '#6b7a9b' };
+  const rc = riskColors[result.impliedRisk] || '#6b7a9b';
+
+  el.style.display = '';
+  el.innerHTML = `
+    <div class="call-result-inner">
+      <div class="call-result-top">
+        <div class="call-result-contract-label">Contract Analysis</div>
+        <div class="call-result-title">"${escapeHtml(inputText)}"</div>
+        <div class="call-result-category">${escapeHtml(result.categoryLabel)} category · ${escapeHtml(result.marginErosion)}pp margin erosion at this scenario</div>
+      </div>
+      <div class="call-result-prices">
+        <div class="crp-block crp-yes">
+          <div class="crp-label">YES</div>
+          <div class="crp-val">${result.yesPrice}¢</div>
+          <div class="crp-sub">per $1 contract</div>
+        </div>
+        <div class="crp-block crp-prob">
+          <div class="crp-label">PROBABILITY</div>
+          <div class="crp-val" style="color:${rc}">${result.probability}%</div>
+          <div class="crp-sub" style="color:${rc}">${escapeHtml(riskCfg.label)} Risk</div>
+        </div>
+        <div class="crp-block crp-no">
+          <div class="crp-label">NO</div>
+          <div class="crp-val">${result.noPrice}¢</div>
+          <div class="crp-sub">per $1 contract</div>
+        </div>
+      </div>
+      <div class="call-result-analysis">${escapeHtml(result.analysis)}</div>
+      <button class="call-result-cta" onclick="switchToOrderTab()">Model ${escapeHtml(result.categoryLabel)} order impact →</button>
+    </div>`;
+
+  updateRiskMeter(result.impliedRisk);
+}
+
+function initContractCall() {
+  const btn   = document.getElementById('call-btn');
+  const input = document.getElementById('call-input');
+  if (!btn || !input) return;
+
+  const doAnalyze = () => {
+    const val = input.value.trim();
+    if (!val) { showToast('Enter a trade scenario to analyze', 'warn', 2500); return; }
+    const result = analyzeContractCall(val);
+    if (result) renderCallResult(result, val);
+  };
+
+  btn.addEventListener('click', doAnalyze);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') doAnalyze(); });
+
+  document.querySelectorAll('.call-example-btn').forEach(exBtn => {
+    exBtn.addEventListener('click', () => {
+      const call = exBtn.dataset.call;
+      if (input) { input.value = call; }
+      const result = analyzeContractCall(call);
+      if (result) renderCallResult(result, call);
+    });
+  });
+}
+
 /* ── Charts ──────────────────────────────────────────────────────────────────── */
 let _scenarioChart = null;
 let _categoryChart = null;
@@ -910,6 +1107,7 @@ async function loadDashboard() {
     showToast('Using demo data — connect AWS for live predictions', 'warn', 6000);
   }
 
+  renderFeaturedContracts(tradeData.predictions || {}, tradeData.cost_impacts || {});
   renderCategoryCards(tradeData.cost_impacts || {});
   makeCardsClickable();
   renderPolicyTracker(tradeData.policy_status || []);
@@ -986,6 +1184,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initOrderCommitmentListeners();
   initMethodologyModal();
+  initContractCall();
   renderDecisionBanner({}, null); // show deadline days immediately
   loadDashboard();
 });
