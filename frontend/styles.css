@@ -1038,11 +1038,13 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   gap: 0;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  border-bottom: 2px solid var(--border-2);
   padding: 0 16px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   overflow-x: auto;
+  min-height: 56px;
 }
 
 .banner-segment {
@@ -1174,9 +1176,9 @@ a:hover { text-decoration: underline; }
 }
 
 @media (max-width: 600px) {
-  .decision-banner { flex-direction: column; align-items: flex-start; }
+  .decision-banner { flex-wrap: wrap; align-items: flex-start; min-height: unset; }
   .banner-divider { display: none; }
-  .banner-segment { padding: 10px 0; border-bottom: 1px solid var(--border); width: 100%; }
+  .banner-segment { padding: 10px 0; border-bottom: 1px solid var(--border); width: 100%; flex-shrink: 0; }
   .banner-segment:last-child { border-bottom: none; }
   .banner-metrics { flex-wrap: wrap; gap: 16px; }
 }
@@ -1383,7 +1385,7 @@ a:hover { text-decoration: underline; }
   border: 1px solid rgba(79,82,232,.18);
   border-radius: var(--radius);
   padding: 20px 24px 18px;
-  margin: 0 0 var(--gap);
+  margin: 0;
 }
 .rs-eyebrow {
   font-size: 10px;
