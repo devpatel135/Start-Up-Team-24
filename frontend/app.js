@@ -16,13 +16,49 @@ const CATEGORY_META = {
   activewear:  { label: 'Activewear',  sourcing: '55% China-sourced', icon: '<path d="M13 3l5 9H6l5-9M11 12v9M13 12v9M9 21h6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>' },
 };
 
-/* ── Sourcing alternatives (hardcoded for prototype) ─────────────────────────── */
+/* ── Sourcing alternatives (April 2025 tariff reality) ───────────────────────── */
 const SOURCING_ALTS = [
-  { origin: 'China (current)',  tariff: 145, leadDays: '90–120', capacity: 'High',     tariffFactor: 1.000 },
-  { origin: 'Vietnam',          tariff: 46,  leadDays: '75–90',  capacity: 'Med-High', tariffFactor: 0.317 },
-  { origin: 'Bangladesh',       tariff: 15.3,leadDays: '90–105', capacity: 'Medium',   tariffFactor: 0.106 },
-  { origin: 'Mexico (USMCA)',   tariff: 0,   leadDays: '30–45',  capacity: 'Low-Med',  tariffFactor: 0.000 },
+  { origin: 'China (current)',  tariff: 145, leadDays: '90–120', capacity: 'High',     tariffFactor: 1.000, note: 'Fully active — no pause' },
+  { origin: 'Vietnam',          tariff: 46,  leadDays: '75–90',  capacity: 'Med-High', tariffFactor: 0.317, note: '90-day pause active (10% interim)' },
+  { origin: 'Bangladesh',       tariff: 37,  leadDays: '90–105', capacity: 'Medium',   tariffFactor: 0.255, note: '90-day pause active (10% interim)' },
+  { origin: 'Mexico (USMCA)',   tariff: 0,   leadDays: '30–45',  capacity: 'Low-Med',  tariffFactor: 0.000, note: 'Fully exempt — most stable option' },
 ];
+
+/* ── Demo data (pre-computed for pitch resilience) ───────────────────────────── */
+// Based on p50=0.145, p90=0.42 tariff deltas × category profiles
+const DEMO_DATA = {
+  predictions: {
+    scenario_probs: { p10: 0.20, p50: 0.55, p90: 0.25 },
+    scenario_tariff_deltas: { p10: 0.0, p50: 0.145, p90: 0.42 },
+    reasoning: 'Demo mode: pre-computed based on April 2025 tariff baseline (145% China, Vietnam/Bangladesh on 90-day pause). Connect AWS for live AI predictions.',
+  },
+  policy_status: [
+    { id: 'section301', name: 'China Section 301 Tariffs', status: 'active', direction: 'escalating', risk: 'severe', note: '145% effective rate fully in force. No pause.' },
+    { id: 'vietnam_pause', name: 'Vietnam 90-Day Pause', status: 'active', direction: 'uncertain', risk: 'high', note: '46% rate paused; 10% interim. Expiry risk for Spring 2027 orders.' },
+    { id: 'bangladesh_pause', name: 'Bangladesh 90-Day Pause', status: 'active', direction: 'uncertain', risk: 'high', note: '37% rate paused; 10% interim. Same expiry risk.' },
+    { id: 'usmca', name: 'USMCA (Mexico)', status: 'active', direction: 'stable', risk: 'low', note: 'Fully exempt. 0% for qualifying apparel.' },
+    { id: 'gsp', name: 'GSP', status: 'lapsed', direction: 'stable', risk: 'low', note: 'Lapsed 2017. Not a factor.' },
+  ],
+  alerts: [
+    { severity: 'critical', title: '145% China Tariff — Fully Active', detail: 'The 145% effective tariff rate on Chinese apparel is in full force. Orders sourced from China will face a landed cost increase of 29–40% across categories.', category: 'tariff' },
+    { severity: 'critical', title: 'Vietnam/Bangladesh Pause Expiry Risk', detail: 'The 90-day pause on 46% (Vietnam) and 37% (Bangladesh) tariffs may expire before Spring 2027 orders ship. Model both scenarios before committing.', category: 'tariff' },
+    { severity: 'warning', title: 'Order Deadline: March 1, 2027', detail: 'Build contractual price-adjustment provisions before committing Spring 2027 purchase orders.', category: 'policy_change' },
+    { severity: 'info', title: 'Mexico (USMCA): Only Fully-Exempt Sourcing', detail: 'Mexico remains at 0% tariff — the only major apparel origin fully exempt from April 2025 trade actions.', category: 'supply_chain' },
+  ],
+  cost_impacts: {
+    basics:      { p10: 0, p50: 0.0292, p90: 0.0847 },
+    denim:       { p10: 0, p50: 0.0145, p90: 0.0421 },
+    outerwear:   { p10: 0, p50: 0.0268, p90: 0.0778 },
+    footwear:    { p10: 0, p50: 0.0330, p90: 0.0957 },
+    accessories: { p10: 0, p50: 0.0246, p90: 0.0714 },
+    activewear:  { p10: 0, p50: 0.0239, p90: 0.0693 },
+  },
+  news_headlines: [],
+  has_live_news: false,
+  deadline_days: Math.max(0, Math.ceil((new Date(2027, 2, 1) - new Date()) / 86400000)),
+  timestamp: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
+  _isDemo: true,
+};
 
 const GAUGE_ARC_LENGTH = 219;
 
@@ -37,6 +73,29 @@ const RISK_CONFIG = {
 /* ── Module-level state ─────────────────────────────────────────────────────── */
 let _costImpacts = null;
 let _predictions = null;
+
+/* ── Toast notifications ─────────────────────────────────────────────────────── */
+function showToast(message, type = 'info', duration = 4000) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container';
+    container.setAttribute('aria-live', 'polite');
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  toast.className = `toast toast--${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => toast.classList.add('toast--visible'));
+  });
+  setTimeout(() => {
+    toast.classList.remove('toast--visible');
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
 
 /* ── Utilities ──────────────────────────────────────────────────────────────── */
 function escapeHtml(str) {
@@ -213,6 +272,33 @@ function updateRiskMeter(riskLevel) {
   });
 }
 
+/* ── Render: Risk Statement ──────────────────────────────────────────────────── */
+function renderRiskStatement(predictions, costImpacts, riskLevel) {
+  const el = document.getElementById('risk-statement');
+  if (!el) return;
+  const probs = (predictions || {}).scenario_probs || {};
+  const p50Prob = Math.round((probs.p50 || 0.55) * 100);
+  const p90Prob = Math.round((probs.p90 || 0.25) * 100);
+  const margin = 0.5;
+  const p50pp = avgMarginErosion(costImpacts || {}, 'p50', margin).toFixed(1);
+  const p90pp = avgMarginErosion(costImpacts || {}, 'p90', margin).toFixed(1);
+  const days = daysToDeadline();
+  const riskLabels = { low: 'Low', moderate: 'Moderate', high: 'High', severe: 'Severe', unknown: 'Loading' };
+  const riskCfg = RISK_CONFIG[riskLevel] || RISK_CONFIG.unknown;
+  el.innerHTML = `
+    <p class="rs-eyebrow">AI Risk Assessment · Spring 2027 Buying Cycle</p>
+    <p class="rs-headline">Risk level is <span class="rs-num" style="color:${riskCfg.color}">${riskLabels[riskLevel] || '—'}</span> — ${p50Prob}% chance of P50 scenario with <span class="rs-num">${p50pp}pp</span> avg margin erosion</p>
+    <div class="rs-stats" id="rs-stats">
+      <div class="rs-stat"><span class="rs-stat-val" style="color:var(--moderate)">${p50pp}pp</span><span class="rs-stat-label">P50 Margin Erosion</span></div>
+      <span class="rs-stat-sep"></span>
+      <div class="rs-stat"><span class="rs-stat-val" style="color:var(--high)">${p90pp}pp</span><span class="rs-stat-label">P90 Margin Erosion</span></div>
+      <span class="rs-stat-sep"></span>
+      <div class="rs-stat"><span class="rs-stat-val">${p90Prob}%</span><span class="rs-stat-label">Severe Scenario Prob.</span></div>
+      <span class="rs-stat-sep"></span>
+      <div class="rs-stat"><span class="rs-stat-val" style="color:${days < 60 ? 'var(--high)' : 'var(--accent)'}">${days}</span><span class="rs-stat-label">Days to Deadline</span></div>
+    </div>`;
+}
+
 /* ── Render: Category Cards ──────────────────────────────────────────────────── */
 function renderCategoryCards(costImpacts) {
   const grid = document.getElementById('category-grid');
@@ -226,7 +312,11 @@ function renderCategoryCards(costImpacts) {
     const maxPct = Math.max(impacts.p90 || 0, 0.08);
 
     const card = document.createElement('div');
-    card.className = 'category-card';
+    card.className = 'category-card category-card--clickable';
+    card.dataset.cat = cat;
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-label', `Model ${meta.label} order impact`);
     card.style.setProperty('--card-accent', accent);
 
     card.innerHTML = `
@@ -257,6 +347,36 @@ function renderCategoryCards(costImpacts) {
 
     grid.appendChild(card);
   }
+}
+
+/* ── Category card click → pre-fill Order Commitment ────────────────────────── */
+function makeCardsClickable() {
+  document.querySelectorAll('.category-card--clickable').forEach(card => {
+    const activate = () => {
+      const cat = card.dataset.cat;
+      if (!cat) return;
+      const sel = document.getElementById('oc-category');
+      if (sel) sel.value = cat;
+      switchToOrderTab();
+      showToast(`Modeling ${CATEGORY_META[cat]?.label || cat} order impact`, 'info', 2500);
+    };
+    card.addEventListener('click', activate);
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); } });
+  });
+}
+
+/* ── Methodology modal ───────────────────────────────────────────────────────── */
+function initMethodologyModal() {
+  const overlay = document.getElementById('methodology-modal');
+  const openBtn = document.getElementById('methodology-btn');
+  const closeBtn = document.getElementById('modal-close');
+  if (!overlay || !openBtn) return;
+  const open = () => { overlay.classList.add('modal-overlay--visible'); openBtn.setAttribute('aria-expanded', 'true'); };
+  const close = () => { overlay.classList.remove('modal-overlay--visible'); openBtn.setAttribute('aria-expanded', 'false'); };
+  openBtn.addEventListener('click', open);
+  if (closeBtn) closeBtn.addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 }
 
 /* ── Render: Predictions Panel ───────────────────────────────────────────────── */
@@ -544,13 +664,14 @@ function updateOrderCommitmentResults() {
 
     <!-- Section 3: Sourcing Alternatives -->
     <div class="oc-section-label">Sourcing Alternatives</div>
-    <p class="oc-section-desc">Estimated P50 impact if you shift production — based on current effective tariff rates.</p>
+    <p class="oc-section-desc">Estimated P50 impact if you shift production — based on April 2025 effective tariff rates. <strong>Note:</strong> Vietnam &amp; Bangladesh rates reflect 90-day pause (interim 10%); full rates apply at pause expiry.</p>
     <div class="oc-table-wrap">
     <table class="pt-results-table sourcing-table" role="table">
       <thead>
         <tr>
           <th scope="col">Origin</th>
-          <th scope="col">Effective Tariff</th>
+          <th scope="col">Rate (Announced)</th>
+          <th scope="col">Status</th>
           <th scope="col">Lead Time</th>
           <th scope="col">Capacity</th>
           <th scope="col">P50 Cost Impact</th>
@@ -562,6 +683,7 @@ function updateOrderCommitmentResults() {
           <tr class="${i === 0 ? 'sourcing-row--current' : ''}">
             <td style="font-weight:${i === 0 ? '600' : '400'}">${escapeHtml(alt.origin)}${i === 0 ? ' <span class="current-tag">current</span>' : ''}</td>
             <td style="color:${alt.tariff > 50 ? 'var(--high)' : alt.tariff > 20 ? 'var(--moderate)' : 'var(--low)'}; font-family:var(--font-mono); font-weight:600">${alt.tariff}%</td>
+            <td style="font-size:11px;color:var(--text-muted)">${escapeHtml(alt.note || '')}</td>
             <td style="font-family:var(--font-mono); font-size:11px">${escapeHtml(alt.leadDays)}d</td>
             <td>${escapeHtml(alt.capacity)}</td>
             <td style="color:${impactColor(alt.altImpact)}; font-family:var(--font-mono)">${fmt(alt.altImpact)}</td>
@@ -616,6 +738,7 @@ function updateTimestamp(iso) {
 /* ── Main data flow ──────────────────────────────────────────────────────────── */
 async function loadDashboard() {
   let tradeData = null;
+  let isDemo = false;
 
   // ── Step 1: Fetch predictions from policy_predictor Lambda ───────────────
   try {
@@ -624,55 +747,68 @@ async function loadDashboard() {
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     tradeData = await resp.json();
-
-    renderCategoryCards(tradeData.cost_impacts || {});
-    renderPolicyTracker(tradeData.policy_status || []);
-    renderAlerts(tradeData.alerts || []);
-    renderOrderCommitment(tradeData.cost_impacts || {}, tradeData.predictions || {});
-    renderPredictionsPanel(
-      tradeData.predictions || {},
-      tradeData.news_headlines || [],
-      tradeData.has_live_news || false
-    );
-    renderDecisionBanner(tradeData.predictions || {}, tradeData.cost_impacts || {});
-    renderKPICards(tradeData.cost_impacts || {}, tradeData.predictions || {});
-    updateTimestamp(tradeData.timestamp);
-
+    showToast('Live AI predictions loaded', 'success', 3000);
   } catch (err) {
-    console.error('Trade data fetch failed:', err);
-    showError('category-grid', 'Could not reach the trade data service.');
-    showError('predictions-panel', 'Trade data unavailable.');
-    renderDecisionBanner({}, null);
-    updateTimestamp(null);
+    console.warn('Trade data fetch failed — using demo data:', err);
+    tradeData = DEMO_DATA;
+    isDemo = true;
+    showToast('Using demo data — connect AWS for live predictions', 'warn', 6000);
   }
+
+  renderCategoryCards(tradeData.cost_impacts || {});
+  makeCardsClickable();
+  renderPolicyTracker(tradeData.policy_status || []);
+  renderAlerts(tradeData.alerts || []);
+  renderOrderCommitment(tradeData.cost_impacts || {}, tradeData.predictions || {});
+  renderPredictionsPanel(
+    tradeData.predictions || {},
+    tradeData.news_headlines || [],
+    tradeData.has_live_news || false
+  );
+  renderDecisionBanner(tradeData.predictions || {}, tradeData.cost_impacts || {});
+  renderKPICards(tradeData.cost_impacts || {}, tradeData.predictions || {});
+  updateTimestamp(tradeData.timestamp);
 
   // ── Step 2: LLM analysis via Bedrock Analyzer ────────────────────────────
-  try {
-    const body = tradeData
-      ? {
-          predictions: tradeData.predictions || {},
-          cost_impacts: tradeData.cost_impacts || {},
-          alerts: tradeData.alerts || [],
-        }
-      : { predictions: {}, cost_impacts: {}, alerts: [] };
+  let riskLevel = 'unknown';
+  if (!isDemo) {
+    try {
+      const body = {
+        predictions: tradeData.predictions || {},
+        cost_impacts: tradeData.cost_impacts || {},
+        alerts: tradeData.alerts || [],
+      };
+      const analyzeResp = await fetch(`${API_BASE}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!analyzeResp.ok) throw new Error(`HTTP ${analyzeResp.status}`);
+      const analyzeData = await analyzeResp.json();
 
-    const analyzeResp = await fetch(`${API_BASE}/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!analyzeResp.ok) throw new Error(`HTTP ${analyzeResp.status}`);
-    const analyzeData = await analyzeResp.json();
-
-    renderSummary(analyzeData.summary);
-    updateRiskMeter(analyzeData.risk_level || 'unknown');
-    renderRecommendations(analyzeData.recommendations || []);
-
-  } catch (err) {
-    console.error('Analysis fetch failed:', err);
-    showError('llm-summary', 'AI analysis unavailable.');
-    updateRiskMeter('unknown');
+      riskLevel = analyzeData.risk_level || 'unknown';
+      renderSummary(analyzeData.summary);
+      updateRiskMeter(riskLevel);
+      renderRecommendations(analyzeData.recommendations || []);
+    } catch (err) {
+      console.warn('Analysis fetch failed:', err);
+      riskLevel = 'high';
+      renderSummary('AI analysis unavailable — connect AWS Bedrock for live risk assessment. Based on current tariff data, risk level is estimated as HIGH given the 145% China tariff and uncertainty around Vietnam/Bangladesh pause expiry.');
+      updateRiskMeter(riskLevel);
+    }
+  } else {
+    riskLevel = 'high';
+    renderSummary('Demo mode: Based on the 145% effective China tariff rate and 90-day pause uncertainty for Vietnam (46%) and Bangladesh (37%), the Spring 2027 order cycle carries HIGH risk. P50 scenario implies 2–3pp average margin erosion across categories, with P90 (severe) reaching 7–10pp. Connect AWS to get live AI-generated analysis.');
+    updateRiskMeter(riskLevel);
+    renderRecommendations([
+      'Audit China-sourced inventory across all 6 categories and quantify P50 cost impact as a share of gross margin before committing.',
+      'Model Vietnam and Bangladesh orders under BOTH pause-active (10%) and pause-expired (46%/37%) scenarios — do not assume the pause renews.',
+      'Negotiate price-escalation provisions with suppliers tied to published tariff rate changes before signing Spring 2027 purchase orders.',
+    ]);
   }
+
+  // ── Step 3: Render risk statement hero with final risk level ─────────────
+  renderRiskStatement(tradeData.predictions || {}, tradeData.cost_impacts || {}, riskLevel);
 }
 
 /* ── Order commitment live input listeners ───────────────────────────────────── */
@@ -687,6 +823,7 @@ function initOrderCommitmentListeners() {
 document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initOrderCommitmentListeners();
+  initMethodologyModal();
   renderDecisionBanner({}, null); // show deadline days immediately
   loadDashboard();
 });

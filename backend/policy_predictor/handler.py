@@ -20,100 +20,123 @@ CATEGORY_PROFILES = {
 
 HISTORICAL_CONTEXT = """KEY HISTORICAL US TRADE POLICY FACTS (Apparel Imports):
 
-Section 301 China Tariffs:
-- 2018: Lists 1-3 imposed (25% on $250B+ goods incl. HTS Chapters 61-62 apparel)
+Section 301 China Tariffs — CURRENT STATUS (2025):
+- 2018: Lists 1-3 (25% on $250B+ goods incl. HTS Chapters 61-62 apparel)
 - 2019: List 4A (15% consumer goods/apparel); reduced to 7.5% in Phase 1 deal (Jan 2020)
-- 2022-2024: Biden maintained tariffs; raised rates on EVs/solar/steel; apparel unchanged at 7.5-25%
-- 2025 (Trump admin): Executive orders proposing 60%+ blanket tariffs on all Chinese imports; legal/legislative process ongoing
-- Current effective rate on Chinese woven apparel: ~44.5% (MFN 12% + List 3 25% + List 4A 7.5%)
+- 2022-2024: Biden maintained tariffs; apparel remained at 7.5-25% Section 301
+- April 2, 2025 ("Liberation Day"): Executive Order imposed ADDITIONAL 125% reciprocal surcharge on all Chinese imports
+  - Combined EFFECTIVE tariff on Chinese woven apparel: approximately 145%
+  - (10% emergency base + 125% reciprocal Section 301 supplemental + legacy 7.5-25%)
+  - This rate is FULLY IN EFFECT — no pause, no court stay as of mid-2025
+  - China is explicitly excluded from any pause announcements
+
+April 9, 2025 — 90-Day Pause on Most (not China) Reciprocal Tariffs:
+- 90-day pause on "Liberation Day" reciprocal tariffs for most countries except China
+- Vietnam: 46% reciprocal tariff PAUSED; interim 10% rate applies during pause window
+- Bangladesh: 37% reciprocal tariff PAUSED; interim 10% rate applies during pause window
+- Indonesia, Cambodia, others: similar pause structure
+- Pause expiry risk: if not renewed, Vietnam/Bangladesh revert to 46%/37% rates
+  — THIS IS A MAJOR RISK for buyers using Vietnam/Bangladesh as China alternatives
 
 USMCA:
-- In force July 2020. Duty-free for North American qualifying goods (yarn-forward for apparel)
+- In force July 2020; duty-free for qualifying North American goods (yarn-forward for apparel)
+- Mexico explicitly EXEMPT from April 2025 reciprocal tariffs; remains 0% for qualifying apparel
 - Mandatory 6-year review opens 2026; any party may exit with 6-month notice
-- Current status: active and stable; no apparel-specific provisions under immediate threat
+- Most stable apparel sourcing option; limited production capacity is the constraint
 
 MFN Tariff Rates:
-- Base US import tariffs (~12-17%) apply to Vietnam, Bangladesh, Indonesia, EU
-- Not subject to Section 301; stable unless major WTO dispute
+- Base US import tariffs (~12-17%) apply to countries not hit by reciprocal tariffs
+- Stable unless specific executive orders or WTO disputes arise
 
 GSP (Generalized System of Preferences):
-- Lapsed December 2017; NOT renewed for apparel categories
-- Effectively inactive for clothing importers since 2018
+- Lapsed December 2017; NOT renewed for apparel categories; effectively inactive
 
-Vietnam Trade Exposure:
-- USTR opened Section 301 investigation on currency practices (2020); no tariffs imposed
-- MFN rates (~12-17%) apply; risk of escalation if trade imbalance grows"""
+Vietnam Trade Exposure (UPDATED 2025):
+- 46% reciprocal tariff announced April 2025; currently on 90-day pause (10% interim)
+- If pause expires: Vietnam loses competitive advantage vs China on tariff cost basis
+- Key buyer risk: orders committed for Spring 2027 delivery may ship after pause window closes
+
+Bangladesh Trade Exposure (UPDATED 2025):
+- 37% reciprocal tariff announced April 2025; currently on 90-day pause (10% interim)
+- Same pause expiry risk as Vietnam — previously cheapest sourcing alternative at ~15.3% MFN"""
 
 DEFAULT_PREDICTIONS = {
-    "scenario_tariff_deltas": {"p10": 0.0, "p50": 0.15, "p90": 0.40},
-    "scenario_probs": {"p10": 0.25, "p50": 0.50, "p90": 0.25},
+    "scenario_tariff_deltas": {"p10": 0.0, "p50": 0.145, "p90": 0.42},
+    "scenario_probs": {"p10": 0.20, "p50": 0.55, "p90": 0.25},
     "policy_status": [
         {
             "id": "section301",
-            "name": "Section 301 China Tariffs",
+            "name": "China Section 301 Tariffs",
             "status": "active",
             "direction": "escalating",
+            "risk": "severe",
+            "note": "145% effective rate fully in force (10% base + 125% reciprocal). No pause. Highest rate in modern US trade history.",
+        },
+        {
+            "id": "vietnam_pause",
+            "name": "Vietnam 90-Day Tariff Pause",
+            "status": "active",
+            "direction": "uncertain",
             "risk": "high",
-            "note": "Current 25-44.5% effective rate; 60%+ proposals under active legislative review.",
+            "note": "46% rate paused; interim 10% applies. Pause expires before Spring 2027 orders ship — revert risk is HIGH.",
+        },
+        {
+            "id": "bangladesh_pause",
+            "name": "Bangladesh 90-Day Tariff Pause",
+            "status": "active",
+            "direction": "uncertain",
+            "risk": "high",
+            "note": "37% rate paused; interim 10% applies. Same pause-expiry risk as Vietnam for Spring 2027 orders.",
         },
         {
             "id": "usmca",
-            "name": "USMCA",
-            "status": "active",
-            "direction": "uncertain",
-            "risk": "moderate",
-            "note": "2026 mandatory review window approaching; US exit requires 6-month notice.",
-        },
-        {
-            "id": "mfn",
-            "name": "MFN Tariff Rates",
+            "name": "USMCA (Mexico)",
             "status": "active",
             "direction": "stable",
             "risk": "low",
-            "note": "Base ~12-17% rates stable; no immediate WTO negotiation risk.",
+            "note": "Mexico explicitly exempt from April 2025 reciprocal tariffs. 0% for qualifying apparel. 2026 review is routine.",
         },
         {
             "id": "gsp",
             "name": "GSP (Developing Country Preferences)",
             "status": "lapsed",
-            "direction": "uncertain",
-            "risk": "moderate",
-            "note": "Lapsed 2017; not renewed for apparel; no reinstatement expected near-term.",
-        },
-        {
-            "id": "vietnam",
-            "name": "Vietnam Trade Exposure",
-            "status": "under_review",
-            "direction": "uncertain",
-            "risk": "moderate",
-            "note": "USTR currency investigation open but dormant; MFN rates currently apply.",
+            "direction": "stable",
+            "risk": "low",
+            "note": "Lapsed 2017; not renewed for apparel. Not a factor in current trade environment.",
         },
     ],
     "alerts": [
         {
             "severity": "critical",
-            "title": "60%+ China Tariff Proposals Active",
-            "detail": "Trump administration proposals to impose 60%+ blanket tariffs on Chinese imports remain active legislative targets. If enacted, effective rate on Chinese apparel would exceed 70%. Orders with China delivery in the next 90 days carry significant exposure.",
+            "title": "145% China Tariff — Fully Active, No Pause",
+            "detail": "The 145% effective tariff rate on Chinese apparel is in full force with no court stay or pause. Any Spring 2027 order sourced from China at current cost assumptions will face a landed cost increase of 29–40% across categories. Immediate sourcing diversification audit required.",
+            "category": "tariff",
+        },
+        {
+            "severity": "critical",
+            "title": "Vietnam/Bangladesh Pause Expiry Before Spring 2027 Delivery",
+            "detail": "The 90-day pause on 46% (Vietnam) and 37% (Bangladesh) reciprocal tariffs may expire well before Spring 2027 orders ship. Orders committed now on the assumption of 10% interim rates could face the full reciprocal rate at landing. Model both scenarios before committing.",
             "category": "tariff",
         },
         {
             "severity": "warning",
-            "title": "USMCA 2026 Review Window Opening",
-            "detail": "The 6-year mandatory USMCA review opens in 2026. All parties may renegotiate apparel rules of origin. Early sourcing diversification to qualifying North American suppliers reduces long-term exposure.",
+            "title": "Order Deadline Risk: March 1, 2027",
+            "detail": "Spring 2027 purchase order commitments are due by March 1, 2027. Tariff policy is actively changing. Orders placed at current cost assumptions may need to be repriced if the Vietnam/Bangladesh pause expires. Build contractual price-adjustment provisions before committing.",
             "category": "policy_change",
         },
         {
             "severity": "info",
-            "title": "Vietnam: Low-Risk Alternative Sourcing",
-            "detail": "Vietnam-sourced apparel faces MFN rates (~12-17%) with no Section 301 exposure. USTR currency investigation remains dormant. Consider as diversification hedge against China tariff escalation.",
+            "title": "Mexico (USMCA): Only Fully-Exempt Sourcing Option",
+            "detail": "Mexico-sourced qualifying apparel remains at 0% tariff — the only major sourcing origin fully exempt from April 2025 trade actions. Limited production capacity is the constraint. Worth exploring for core SKUs with 30–45 day lead times.",
             "category": "supply_chain",
         },
     ],
     "reasoning": (
-        "Current distribution reflects elevated but uncertain China tariff escalation risk. "
-        "The 60%+ tariff proposal faces legal and economic headwinds, making a severe outcome (P90) "
-        "less probable than a moderate increase (P50). An optimistic scenario (P10) reflects a "
-        "possible trade deal framework or court-ordered pause on tariff authority."
+        "With 145% China tariffs fully in force and Vietnam/Bangladesh pause expiry uncertain, "
+        "the moderate (P50) scenario at +14.5pp additional tariff delta reflects continued "
+        "escalation risk beyond current baseline. Optimistic (P10, 0pp delta) requires a formal "
+        "US-China trade deal — unlikely before March 2027. Severe (P90, +42pp) reflects full "
+        "Vietnam/Bangladesh reversion plus additional China measures."
     ),
 }
 
@@ -260,6 +283,10 @@ def lambda_handler(event, context):
 
     cost_impacts = compute_cost_impacts(predictions)
 
+    now = datetime.now(timezone.utc)
+    deadline = datetime(2027, 3, 1, tzinfo=timezone.utc)
+    deadline_days = max(0, (deadline - now).days)
+
     payload = {
         "predictions": {
             "scenario_probs": predictions.get("scenario_probs", DEFAULT_PREDICTIONS["scenario_probs"]),
@@ -273,7 +300,8 @@ def lambda_handler(event, context):
         "cost_impacts": cost_impacts,
         "news_headlines": news_headlines,
         "has_live_news": bool(news_headlines),
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "deadline_days": deadline_days,
+        "timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
     return {

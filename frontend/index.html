@@ -25,6 +25,10 @@
         </div>
       </div>
       <div class="header-meta">
+        <button class="help-btn" id="methodology-btn" aria-label="How it works">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" width="14" height="14"><circle cx="8" cy="8" r="6"/><path d="M8 11v-1M8 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3"/></svg>
+          How it works
+        </button>
         <div class="meta-chip" id="live-chip">
           <span class="meta-dot" id="live-dot"></span>
           <span class="meta-label">AI Predictions</span>
@@ -91,6 +95,13 @@
   <!-- ── Tab: Overview ─────────────────────────────────────────────────────── -->
   <div class="tab-panel active" id="tab-overview">
     <main class="layout">
+
+      <!-- Risk Statement Hero -->
+      <div class="risk-statement" id="risk-statement" aria-live="polite">
+        <p class="rs-eyebrow">AI Risk Assessment</p>
+        <p class="rs-headline">Analyzing current trade conditions…</p>
+        <div class="rs-stats" id="rs-stats"></div>
+      </div>
 
       <!-- Risk Meter + Summary -->
       <section class="panel panel--risk" aria-labelledby="risk-heading">
@@ -261,6 +272,21 @@
     <span>Analysis: Claude 3.5 Sonnet · AWS Bedrock · <span id="footer-ts"></span></span>
     <span>Data: US Trade Policy historical context + live AI reasoning</span>
   </footer>
+
+  <!-- Methodology Modal -->
+  <div class="modal-overlay" id="methodology-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+      <button class="modal-close" id="modal-close" aria-label="Close">&#10005;</button>
+      <h2 class="modal-title" id="modal-title">How the Dashboard Works</h2>
+      <div class="modal-step"><span class="modal-step-num">1</span><div><strong>Historical Context</strong> — We load verified US trade policy facts: Section 301 rates, the April 2025 "Liberation Day" actions (145% China effective rate), 90-day pauses for Vietnam (46%) and Bangladesh (37%), and USMCA exemptions for Mexico.</div></div>
+      <div class="modal-step"><span class="modal-step-num">2</span><div><strong>Live News (optional)</strong> — If a NewsAPI key is configured, recent trade headlines are fetched and injected into the AI prompt to reflect the current news cycle.</div></div>
+      <div class="modal-step"><span class="modal-step-num">3</span><div><strong>LLM Scenario Modeling</strong> — Claude 3.5 Sonnet (via AWS Bedrock) reasons over the historical context and news to produce probability-weighted scenario estimates: Optimistic (P10), Moderate (P50), and Severe (P90) tariff deltas.</div></div>
+      <div class="modal-step"><span class="modal-step-num">4</span><div><strong>Cost Impact Calculation</strong> — Each scenario's tariff delta is applied to category-specific China sourcing exposure (% of COGS from China × import cost factor) to compute landed cost impact in percentage points.</div></div>
+      <div class="modal-step"><span class="modal-step-num">5</span><div><strong>Margin Erosion Formula</strong> — <code>impact × (1 − retail_margin)</code> converts landed cost impact to margin erosion in percentage points, shown in the banner and KPI row.</div></div>
+      <div class="modal-step"><span class="modal-step-num">6</span><div><strong>Graceful Degradation</strong> — If AWS Bedrock is unreachable, pre-computed defaults based on the current tariff environment are shown. The dashboard never shows a broken state.</div></div>
+      <p class="modal-footnote">Probabilities are AI estimates for planning purposes, not financial advice. Spring 2027 deadline: March 1, 2027.</p>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

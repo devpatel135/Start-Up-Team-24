@@ -6,7 +6,13 @@ import boto3
 BEDROCK_MODEL_ID = "anthropic.claude-3-5-sonnet-20241022-v2:0"
 BEDROCK_REGION = "us-east-1"
 
-PROMPT_TEMPLATE = """You are a trade risk analyst for a US retail clothing buyer.
+PROMPT_TEMPLATE = """You are a senior trade risk analyst advising a US retail apparel buyer who must commit Spring 2027 purchase orders by March 1, 2027.
+
+CURRENT TARIFF ENVIRONMENT (as of late 2025):
+- China: 145% effective tariff rate in force (10% emergency base + 125% reciprocal Section 301). No pause — fully active.
+- Vietnam: 46% reciprocal tariff announced; 90-day pause active (10% interim). Pause could expire before Spring 2027 orders ship.
+- Bangladesh: 37% reciprocal tariff announced; 90-day pause active (10% interim). Same expiry risk as Vietnam.
+- Mexico (USMCA): 0% — only major apparel origin fully exempt from April 2025 trade actions.
 
 SCENARIO PROBABILITY ESTIMATES:
 {scenarios_summary}
@@ -18,14 +24,14 @@ ACTIVE ALERTS:
 {alerts_summary}
 
 Write exactly two paragraphs:
-1. What the scenario probabilities and policy data signal about trade risk over the next 90 days.
-2. What this means practically for a clothing buyer with order deadlines in the next 90 days — specific, actionable, no hedging.
+1. What the scenario probabilities and the 145% China tariff situation signal about trade risk for retail apparel buyers entering Spring 2027 order commitments — reference the specific cost impact percentages.
+2. What this means practically for a clothing buyer with order deadlines approaching — specific, actionable, no hedging. Reference the margin erosion numbers and name specific actions.
 
 After the two paragraphs, output on a new line: RISK_LEVEL: low|moderate|high|severe
 (based on P50 average cost impact: <2% = low, 2-5% = moderate, 5-10% = high, >10% = severe)
 
 Then output on a new line: RECOMMENDATIONS:
-Followed by exactly 3 bullet points, each starting with "- ", that give specific, numbered action steps for the buyer."""
+Followed by exactly 3 bullet points, each starting with "- ", that give specific, numbered action steps for the retail apparel buyer given their Spring 2027 commitment window."""
 
 FALLBACK_SUMMARY = (
     "AI analysis temporarily unavailable. Review the scenario probability estimates "
