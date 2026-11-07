@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20261107">
   <script>window.API_BASE = '';</script>
 </head>
 <body>
@@ -161,6 +161,15 @@
         </div>
       </section>
 
+      <!-- Category Impact Chart -->
+      <section class="panel" aria-labelledby="cat-chart-heading">
+        <h2 id="cat-chart-heading" class="section-label">Margin Erosion by Category — P50 vs P90 Scenario</h2>
+        <p class="section-desc">At 50% retail margin — footwear and basics most exposed due to China sourcing concentration</p>
+        <div style="position:relative;width:100%;height:220px">
+          <canvas id="category-chart"></canvas>
+        </div>
+      </section>
+
       <!-- Bottom row: Predictions panel + Recommendations -->
       <div class="bottom-row">
 
@@ -168,6 +177,9 @@
         <section class="panel" aria-labelledby="predictions-heading">
           <h2 id="predictions-heading" class="section-label">Market Probability Forecast</h2>
           <p class="section-desc">Probability-weighted tariff scenarios — like a prediction market, powered by Claude AI and verifiable trade policy history</p>
+          <div style="position:relative;width:100%;height:130px;margin-bottom:20px">
+            <canvas id="scenario-chart"></canvas>
+          </div>
           <div id="predictions-panel">
             <div class="skeleton skeleton--line" style="width:90%"></div>
             <div class="skeleton skeleton--line" style="width:75%"></div>
@@ -287,6 +299,7 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="app.js?v=20261107"></script>
 </body>
 </html>

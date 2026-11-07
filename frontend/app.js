@@ -180,6 +180,139 @@ function generateFallbackAnalysis(predictions, costImpacts) {
   return `${para1}\n\n${para2}`;
 }
 
+/* ── Charts ──────────────────────────────────────────────────────────────────── */
+let _scenarioChart = null;
+let _categoryChart = null;
+
+function chartDefaults() {
+  if (typeof Chart === 'undefined') return;
+  Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+  Chart.defaults.color = '#6b7a9b';
+}
+
+function destroyChart(ref) {
+  if (ref) { try { ref.destroy(); } catch (_) {} }
+  return null;
+}
+
+function renderScenarioChart(predictions) {
+  if (typeof Chart === 'undefined') return;
+  const canvas = document.getElementById('scenario-chart');
+  if (!canvas) return;
+  _scenarioChart = destroyChart(_scenarioChart);
+
+  const probs  = (predictions || {}).scenario_probs         || {};
+  const deltas = (predictions || {}).scenario_tariff_deltas || {};
+  const p10 = Math.round((probs.p10 || 0.20) * 100);
+  const p50 = Math.round((probs.p50 || 0.55) * 100);
+  const p90 = Math.round((probs.p90 || 0.25) * 100);
+  const d10 = ((deltas.p10 || 0.0)   * 100).toFixed(0);
+  const d50 = ((deltas.p50 || 0.145) * 100).toFixed(0);
+  const d90 = ((deltas.p90 || 0.42)  * 100).toFixed(0);
+
+  _scenarioChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: [
+        `Optimistic (P10) · +${d10}pp tariff`,
+        `Moderate (P50) · +${d50}pp tariff`,
+        `Severe (P90) · +${d90}pp tariff`,
+      ],
+      datasets: [{
+        label: 'Scenario Probability',
+        data: [p10, p50, p90],
+        backgroundColor: ['#059669cc', '#d97706cc', '#e11d48cc'],
+        borderRadius: 6,
+        borderSkipped: false,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` ${c.raw}% probability` } },
+      },
+      scales: {
+        x: {
+          min: 0, max: 100,
+          ticks: { callback: v => v + '%', font: { size: 11 }, color: '#6b7a9b' },
+          grid: { color: 'rgba(0,0,0,0.06)' },
+          border: { display: false },
+        },
+        y: {
+          ticks: { font: { size: 11 }, color: '#111827' },
+          grid: { display: false },
+          border: { display: false },
+        },
+      },
+    },
+  });
+}
+
+function renderCategoryChart(costImpacts) {
+  if (typeof Chart === 'undefined') return;
+  const canvas = document.getElementById('category-chart');
+  if (!canvas) return;
+  _categoryChart = destroyChart(_categoryChart);
+
+  const cats   = Object.keys(CATEGORY_META);
+  const labels = cats.map(c => CATEGORY_META[c].label);
+  const margin = 0.5;
+  const p50pp  = cats.map(c => +((((costImpacts[c] || {}).p50 || 0)) * (1 - margin) * 100).toFixed(2));
+  const p90pp  = cats.map(c => +((((costImpacts[c] || {}).p90 || 0)) * (1 - margin) * 100).toFixed(2));
+
+  _categoryChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'P50 Scenario',
+          data: p50pp,
+          backgroundColor: '#d97706cc',
+          borderRadius: 4,
+          borderSkipped: false,
+        },
+        {
+          label: 'P90 Scenario',
+          data: p90pp,
+          backgroundColor: '#e11d48cc',
+          borderRadius: 4,
+          borderSkipped: false,
+        },
+      ],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          align: 'start',
+          labels: { font: { size: 11 }, color: '#6b7a9b', padding: 12, boxWidth: 10, boxHeight: 10 },
+        },
+        tooltip: { callbacks: { label: c => ` ${c.raw.toFixed(1)}pp margin erosion` } },
+      },
+      scales: {
+        x: {
+          min: 0,
+          ticks: { callback: v => v + 'pp', font: { size: 11 }, color: '#6b7a9b' },
+          grid: { color: 'rgba(0,0,0,0.06)' },
+          border: { display: false },
+        },
+        y: {
+          ticks: { font: { size: 11 }, color: '#111827' },
+          grid: { display: false },
+          border: { display: false },
+        },
+      },
+    },
+  });
+}
+
 /* ── Tab switching ───────────────────────────────────────────────────────────── */
 function initTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -787,6 +920,8 @@ async function loadDashboard() {
     tradeData.news_headlines || [],
     tradeData.has_live_news || false
   );
+  renderScenarioChart(tradeData.predictions || {});
+  renderCategoryChart(tradeData.cost_impacts || {});
   renderDecisionBanner(tradeData.predictions || {}, tradeData.cost_impacts || {});
   renderKPICards(tradeData.cost_impacts || {}, tradeData.predictions || {});
   updateTimestamp(tradeData.timestamp);
@@ -847,6 +982,7 @@ function initOrderCommitmentListeners() {
 
 /* ── Boot ────────────────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
+  chartDefaults();
   initTabs();
   initOrderCommitmentListeners();
   initMethodologyModal();
