@@ -78,7 +78,7 @@ sed "s|window.API_BASE = ''|window.API_BASE = '${API_ENDPOINT}'|g" \
 echo "→ Uploading frontend assets to S3..."
 aws s3 sync frontend/ "s3://${BUCKET}/" \
   --exclude "*.html" \
-  --cache-control "max-age=86400" \
+  --cache-control "no-cache, no-store, must-revalidate" \
   --region "${REGION}"
 
 aws s3 cp "${TMP_INDEX}" "s3://${BUCKET}/index.html" \
