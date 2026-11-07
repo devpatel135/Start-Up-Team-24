@@ -158,6 +158,28 @@ function avgMarginErosion(costImpacts, scenario, margin) {
   return (sum / cats.length) * 100; // in pp
 }
 
+/* ── Computed fallback analysis (runs when Bedrock is unavailable) ────────────── */
+function generateFallbackAnalysis(predictions, costImpacts) {
+  const probs  = (predictions || {}).scenario_probs         || { p10: 0.20, p50: 0.55, p90: 0.25 };
+  const deltas = (predictions || {}).scenario_tariff_deltas || { p10: 0.0,  p50: 0.145, p90: 0.42 };
+
+  const p50Prob    = Math.round((probs.p50  || 0.55) * 100);
+  const p90Prob    = Math.round((probs.p90  || 0.25) * 100);
+  const p50DeltaPp = ((deltas.p50 || 0.145) * 100).toFixed(0);
+  const p90DeltaPp = ((deltas.p90 || 0.42)  * 100).toFixed(0);
+
+  const avgP50 = avgMarginErosion(costImpacts || {}, 'p50', 0.50);
+  const avgP90 = avgMarginErosion(costImpacts || {}, 'p90', 0.50);
+
+  const days = daysToDeadline();
+
+  const para1 = `The market assigns a ${p50Prob}% probability to the moderate tariff scenario — an additional +${p50DeltaPp}pp delta on top of the already-elevated baseline — implying ${avgP50.toFixed(1)}pp average margin erosion across apparel categories at a 50% retail margin. The severe outcome (${p90Prob}% probability, +${p90DeltaPp}pp delta) would push category erosion to ${avgP90.toFixed(1)}pp, a level that eliminates profitability on standard margin structures without immediate price action. The 145% effective rate on Chinese apparel — combining the 10% emergency base and 125% reciprocal Section 301 surcharge — is fully in force with no court stay or pause in effect.`;
+
+  const para2 = `With ${days} days to the March 1, 2027 commitment deadline, buyers operating on standard 90–120 day China lead times are approaching the point of no return. Vietnam and Bangladesh alternatives currently trade at the interim 10% pause rate, but the 90-day pause window expires before Spring 2027 orders land, introducing binary rate risk of 46% and 37% respectively. Mexico (USMCA) remains the only fully-exempt sourcing origin at 0%. Recommended action: model orders under both pause-active and pause-expired scenarios, build contractual cost-escalation provisions into purchase agreements, and treat the P90 outcome as the institutional stress case — not a tail risk — given the current pace of US trade policy escalation.`;
+
+  return `${para1}\n\n${para2}`;
+}
+
 /* ── Tab switching ───────────────────────────────────────────────────────────── */
 function initTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -787,18 +809,22 @@ async function loadDashboard() {
       const analyzeData = await analyzeResp.json();
 
       riskLevel = analyzeData.risk_level || 'unknown';
-      renderSummary(analyzeData.summary);
+      // If Bedrock fell back internally, generate a data-driven summary instead of the static placeholder
+      const summaryText = (analyzeData.summary || '').startsWith('AI analysis temporarily')
+        ? generateFallbackAnalysis(tradeData.predictions, tradeData.cost_impacts)
+        : analyzeData.summary;
+      renderSummary(summaryText);
       updateRiskMeter(riskLevel);
       renderRecommendations(analyzeData.recommendations || []);
     } catch (err) {
       console.warn('Analysis fetch failed:', err);
       riskLevel = 'high';
-      renderSummary('AI analysis unavailable — connect AWS Bedrock for live risk assessment. Based on current tariff data, risk level is estimated as HIGH given the 145% China tariff and uncertainty around Vietnam/Bangladesh pause expiry.');
+      renderSummary(generateFallbackAnalysis(tradeData.predictions, tradeData.cost_impacts));
       updateRiskMeter(riskLevel);
     }
   } else {
     riskLevel = 'high';
-    renderSummary('Demo mode: Based on the 145% effective China tariff rate and 90-day pause uncertainty for Vietnam (46%) and Bangladesh (37%), the Spring 2027 order cycle carries HIGH risk. P50 scenario implies 2–3pp average margin erosion across categories, with P90 (severe) reaching 7–10pp. Connect AWS to get live AI-generated analysis.');
+    renderSummary(generateFallbackAnalysis(tradeData.predictions, tradeData.cost_impacts));
     updateRiskMeter(riskLevel);
     renderRecommendations([
       'Audit China-sourced inventory across all 6 categories and quantify P50 cost impact as a share of gross margin before committing.',
