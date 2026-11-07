@@ -980,41 +980,40 @@ function updateOrderCommitmentResults() {
     </table>
     </div>
 
-    <!-- Section 2: Absorb vs Pass-Through Decision Matrix (horizontal: strategies as rows) -->
+    <!-- Section 2: Absorb vs Pass-Through Decision Matrix -->
     <div class="oc-section-label">Decision Matrix — Absorb vs. Pass-Through</div>
     <p class="oc-section-desc">Choose your response strategy. Numbers assume ${marginPct}% current retail margin.</p>
-    <div class="oc-table-wrap">
-    <table class="pt-results-table absorb-matrix" role="table">
-      <thead>
-        <tr>
-          <th scope="col">Strategy</th>
-          ${rows.map(r => `<th scope="col" style="color:${r.color}">${escapeHtml(r.label)}</th>`).join('')}
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td style="font-weight:600">Full Absorb <span class="th-sub">0% price change</span></td>
-          ${rows.map(r => `<td class="absorb-cell">
-            <span class="absorb-erosion" style="color:${ppColor(r.marginErosionPp)}">−${r.marginErosionPp.toFixed(1)}pp margin</span>
-            <span class="absorb-sub">${escapeHtml(fmtMoney(r.totalAddedCost))} absorbed</span>
-          </td>`).join('')}
-        </tr>
-        <tr>
-          <td style="font-weight:600">50/50 Split <span class="th-sub">partial pass-through</span></td>
-          ${rows.map(r => `<td class="absorb-cell">
-            <span class="absorb-erosion" style="color:${ppColor(r.marginErosionSplit)}">−${r.marginErosionSplit.toFixed(1)}pp margin</span>
-            <span class="absorb-sub">+${r.priceSplitPct.toFixed(1)}% retail price</span>
-          </td>`).join('')}
-        </tr>
-        <tr>
-          <td style="font-weight:600">Full Pass-Through <span class="th-sub">margin protected</span></td>
-          ${rows.map(r => `<td class="absorb-cell">
-            <span class="absorb-erosion" style="color:var(--low)">0pp margin erosion</span>
-            <span class="absorb-sub">+${r.priceIncreasePct.toFixed(1)}% retail price</span>
-          </td>`).join('')}
-        </tr>
-      </tbody>
-    </table>
+    <div class="absorb-grid">
+      <!-- header row -->
+      <div class="absorb-grid-cell absorb-grid-header absorb-grid-corner"></div>
+      ${rows.map(r => `<div class="absorb-grid-cell absorb-grid-header" style="color:${r.color}">${escapeHtml(r.label)}</div>`).join('')}
+      <!-- Full Absorb row -->
+      <div class="absorb-grid-cell absorb-grid-label">
+        <span class="ag-strategy">Full Absorb</span>
+        <span class="ag-strategy-sub">0% price change</span>
+      </div>
+      ${rows.map(r => `<div class="absorb-grid-cell absorb-grid-data">
+        <span class="ag-primary" style="color:${ppColor(r.marginErosionPp)}">−${r.marginErosionPp.toFixed(1)}pp</span>
+        <span class="ag-secondary">${escapeHtml(fmtMoney(r.totalAddedCost))} absorbed</span>
+      </div>`).join('')}
+      <!-- 50/50 Split row -->
+      <div class="absorb-grid-cell absorb-grid-label">
+        <span class="ag-strategy">50/50 Split</span>
+        <span class="ag-strategy-sub">partial pass-through</span>
+      </div>
+      ${rows.map(r => `<div class="absorb-grid-cell absorb-grid-data">
+        <span class="ag-primary" style="color:${ppColor(r.marginErosionSplit)}">−${r.marginErosionSplit.toFixed(1)}pp</span>
+        <span class="ag-secondary">+${r.priceSplitPct.toFixed(1)}% retail price</span>
+      </div>`).join('')}
+      <!-- Full Pass-Through row -->
+      <div class="absorb-grid-cell absorb-grid-label">
+        <span class="ag-strategy">Full Pass-Through</span>
+        <span class="ag-strategy-sub">margin protected</span>
+      </div>
+      ${rows.map(r => `<div class="absorb-grid-cell absorb-grid-data">
+        <span class="ag-primary" style="color:var(--low)">0pp</span>
+        <span class="ag-secondary">+${r.priceIncreasePct.toFixed(1)}% retail price</span>
+      </div>`).join('')}
     </div>
 
     <!-- Section 3: Sourcing Alternatives -->
