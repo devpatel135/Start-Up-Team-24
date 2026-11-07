@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261107">
+  <link rel="stylesheet" href="styles.css?v=20261107b">
   <script>window.API_BASE = '';</script>
 </head>
 <body>
@@ -242,38 +242,50 @@
         <h2 id="oc-heading" class="section-label">Order Commitment Analyzer</h2>
         <p class="section-desc">Model full cost and margin impact before committing — know your absorb vs. pass-through options</p>
 
-        <div class="price-tool-inputs">
-          <div class="pt-field">
-            <label class="pt-label" for="oc-category">Category</label>
-            <select id="oc-category" class="pt-select">
-              <option value="basics">Basics (T-shirts, basics)</option>
-              <option value="denim">Denim (jeans, jackets)</option>
-              <option value="outerwear">Outerwear (coats, parkas)</option>
-              <option value="footwear">Footwear</option>
-              <option value="accessories">Accessories (bags, belts)</option>
-              <option value="activewear">Activewear</option>
-            </select>
-          </div>
-          <div class="pt-field">
-            <label class="pt-label" for="oc-units">Units Ordered</label>
-            <input type="number" id="oc-units" class="pt-input" value="500" min="1">
-          </div>
-          <div class="pt-field">
-            <label class="pt-label" for="oc-cost">Unit Cost (USD)</label>
-            <input type="number" id="oc-cost" class="pt-input" value="18.00" min="0.01" step="0.01">
-          </div>
-          <div class="pt-field">
-            <label class="pt-label" for="oc-margin">Retail Margin (%)</label>
-            <input type="number" id="oc-margin" class="pt-input" value="50" min="1" max="99">
-          </div>
-          <div class="pt-field">
-            <label class="pt-label" for="oc-budget">Season Budget ($)</label>
-            <input type="number" id="oc-budget" class="pt-input" placeholder="Optional total budget" min="0" step="1000">
-          </div>
-        </div>
+        <div class="oc-two-col">
 
-        <div id="oc-results">
-          <p class="pt-baseline">Load dashboard data to calculate scenario impact.</p>
+          <!-- Left: Parameters -->
+          <div class="oc-inputs-pane">
+            <p class="oc-pane-label">Order Parameters</p>
+            <div class="price-tool-inputs">
+              <div class="pt-field">
+                <label class="pt-label" for="oc-category">Category</label>
+                <select id="oc-category" class="pt-select">
+                  <option value="basics">Basics (T-shirts, basics)</option>
+                  <option value="denim">Denim (jeans, jackets)</option>
+                  <option value="outerwear">Outerwear (coats, parkas)</option>
+                  <option value="footwear">Footwear</option>
+                  <option value="accessories">Accessories (bags, belts)</option>
+                  <option value="activewear">Activewear</option>
+                </select>
+              </div>
+              <div class="pt-field">
+                <label class="pt-label" for="oc-units">Units Ordered</label>
+                <input type="number" id="oc-units" class="pt-input" value="500" min="1">
+              </div>
+              <div class="pt-field">
+                <label class="pt-label" for="oc-cost">Unit Cost (USD)</label>
+                <input type="number" id="oc-cost" class="pt-input" value="18.00" min="0.01" step="0.01">
+              </div>
+              <div class="pt-field">
+                <label class="pt-label" for="oc-margin">Retail Margin (%)</label>
+                <input type="number" id="oc-margin" class="pt-input" value="50" min="1" max="99">
+              </div>
+              <div class="pt-field">
+                <label class="pt-label" for="oc-budget">Season Budget ($)</label>
+                <input type="number" id="oc-budget" class="pt-input" placeholder="Optional total budget" min="0" step="1000">
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Results -->
+          <div class="oc-results-pane">
+            <p class="oc-pane-label">Scenario Impact Analysis</p>
+            <div id="oc-results">
+              <p class="pt-baseline">Load dashboard data to calculate scenario impact.</p>
+            </div>
+          </div>
+
         </div>
       </section>
     </main>
