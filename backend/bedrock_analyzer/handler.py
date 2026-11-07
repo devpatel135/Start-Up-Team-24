@@ -14,7 +14,7 @@ CURRENT TARIFF ENVIRONMENT (as of late 2025):
 - Bangladesh: 37% reciprocal tariff announced; 90-day pause active (10% interim). Same expiry risk as Vietnam.
 - Mexico (USMCA): 0% — only major apparel origin fully exempt from April 2025 trade actions.
 
-SCENARIO PROBABILITY ESTIMATES:
+SCENARIO PROBABILITY ESTIMATES (Bayesian-adjusted from live signals):
 {scenarios_summary}
 
 LANDED COST IMPACTS BY CATEGORY:
@@ -22,6 +22,9 @@ LANDED COST IMPACTS BY CATEGORY:
 
 ACTIVE ALERTS:
 {alerts_summary}
+
+REAL-TIME SIGNAL ANALYSIS:
+{signals_summary}
 
 Write exactly two paragraphs:
 1. What the scenario probabilities and the 145% China tariff situation signal about trade risk for retail apparel buyers entering Spring 2027 order commitments — reference the specific cost impact percentages.
@@ -106,6 +109,35 @@ def _format_alerts(alerts: list) -> str:
     return "\n".join(lines)
 
 
+def _format_signals(signals: dict) -> str:
+    if not signals:
+        return "No signal data available."
+    score = signals.get("signal_score", 0.0)
+    sentiment = signals.get("sentiment", 0.0)
+    velocity = signals.get("velocity", "stable")
+    counts = signals.get("source_counts", {})
+    top = signals.get("top_signals", [])
+
+    intensity = (
+        "Very High" if score > 0.75 else
+        "High" if score > 0.5 else
+        "Moderate" if score > 0.25 else "Low"
+    )
+    sentiment_label = (
+        "Escalation-biased" if sentiment > 0.2 else
+        "De-escalation-biased" if sentiment < -0.2 else "Neutral"
+    )
+    lines = [
+        f"Signal Intensity: {intensity} ({score:.0%}) | Velocity: {velocity.upper()} | Sentiment: {sentiment_label}",
+        f"Sources: {counts.get('news', 0)} news, {counts.get('tweet', 0)} tweets, {counts.get('executive_order', 0)} executive orders",
+    ]
+    if top:
+        lines.append("Top signals:")
+        for s in top[:3]:
+            lines.append(f"  [{s.get('source', '')}] {s.get('title', '')[:80]}")
+    return "\n".join(lines)
+
+
 def _cors_headers() -> dict:
     return {
         "Access-Control-Allow-Origin": "*",
@@ -124,11 +156,13 @@ def lambda_handler(event, context):
         predictions = body.get("predictions", {})
         cost_impacts = body.get("cost_impacts", {})
         alerts = body.get("alerts", [])
+        signals = body.get("signals", {})
 
         prompt = PROMPT_TEMPLATE.format(
             scenarios_summary=_format_scenarios(predictions),
             cost_impacts_summary=_format_cost_impacts(cost_impacts),
             alerts_summary=_format_alerts(alerts),
+            signals_summary=_format_signals(signals),
         )
 
         client = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)

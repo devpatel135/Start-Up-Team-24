@@ -45,7 +45,9 @@ Resources:
             - Effect: Allow
               Action:
                 - ssm:GetParameter
-              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/trade-policy-tool/newsapi-key"
+              Resource:
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/trade-policy-tool/newsapi-key"
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/trade-policy-tool/twitter-bearer-token"
             - Effect: Allow
               Action:
                 - logs:CreateLogGroup

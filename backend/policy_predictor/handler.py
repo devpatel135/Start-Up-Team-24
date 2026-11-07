@@ -3,11 +3,20 @@ import re
 from datetime import datetime, timezone
 
 import boto3
-import requests
+
+from signals import (
+    fetch_news,
+    fetch_executive_orders,
+    fetch_x_tweets,
+    compute_frequency_model,
+    bayesian_update_probs,
+    format_signals_for_prompt,
+)
 
 BEDROCK_MODEL_ID = "anthropic.claude-3-5-sonnet-20241022-v2:0"
 BEDROCK_REGION = "us-east-1"
 NEWSAPI_SSM_PATH = "/trade-policy-tool/newsapi-key"
+TWITTER_SSM_PATH = "/trade-policy-tool/twitter-bearer-token"
 
 CATEGORY_PROFILES = {
     "basics":      {"china_pct": 0.72, "import_factor": 0.28},
@@ -144,7 +153,7 @@ PREDICTION_PROMPT = """You are a trade policy risk analyst for a US retail appar
 
 {historical_context}
 
-{news_section}
+{signals_section}
 
 Return this exact JSON object with no markdown, no explanation:
 {{
@@ -168,54 +177,16 @@ Return this exact JSON object with no markdown, no explanation:
   "alerts": [
     {{"severity": "critical|warning|info", "title": "<short title>", "detail": "<2-3 sentences specific to apparel retail>", "category": "tariff|supply_chain|currency|policy_change"}}
   ],
-  "reasoning": "<2-3 sentences explaining your probability estimates>"
+  "reasoning": "<2-3 sentences explaining your probability estimates, citing any signal evidence above>"
 }}
 
-Generate 2-4 alerts. scenario_probs must sum to exactly 1.0."""
+Generate 2-4 alerts. scenario_probs must sum to exactly 1.0. Use signal analysis above to inform and adjust your probability estimates."""
 
 
-def fetch_news_headlines(api_key: str) -> list:
-    try:
-        resp = requests.get(
-            "https://newsapi.org/v2/everything",
-            params={
-                "q": "tariff OR \"trade policy\" OR \"import duty\" OR \"Section 301\" OR \"China trade\"",
-                "language": "en",
-                "sortBy": "publishedAt",
-                "pageSize": 8,
-            },
-            headers={"X-Api-Key": api_key},
-            timeout=5,
-        )
-        resp.raise_for_status()
-        articles = resp.json().get("articles", [])
-        return [
-            {
-                "title": a.get("title", ""),
-                "source": a.get("source", {}).get("name", ""),
-                "publishedAt": a.get("publishedAt", "")[:10],
-            }
-            for a in articles[:8]
-            if a.get("title")
-        ]
-    except Exception:
-        return []
-
-
-def get_llm_predictions(news_headlines: list) -> dict | None:
-    if news_headlines:
-        news_section = "RECENT NEWS HEADLINES:\n" + "\n".join(
-            f"- [{a['source']}] {a['title']}" for a in news_headlines
-        )
-    else:
-        news_section = (
-            "RECENT NEWS: No live feed available — reason from "
-            "training knowledge and historical context above."
-        )
-
+def get_llm_predictions(signals_section: str) -> dict | None:
     prompt = PREDICTION_PROMPT.format(
         historical_context=HISTORICAL_CONTEXT,
-        news_section=news_section,
+        signals_section=signals_section,
     )
 
     bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
@@ -231,7 +202,6 @@ def get_llm_predictions(news_headlines: list) -> dict | None:
     )
     text = json.loads(response["body"].read())["content"][0]["text"]
 
-    # Extract JSON — handle optional markdown code fences
     json_match = re.search(r"\{.*\}", text, re.DOTALL)
     if json_match:
         return json.loads(json_match.group())
@@ -265,21 +235,54 @@ def lambda_handler(event, context):
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": _cors_headers(), "body": ""}
 
-    # Optional: fetch live news (graceful degradation — no key = no news)
+    ssm = boto3.client("ssm", region_name="us-east-1")
+
+    # ── Gather all signal items ──────────────────────────────────────────────
+    all_signal_items = []
+
+    # 1. Federal Register executive orders (free, no key)
+    eo_items = fetch_executive_orders(days_back=90)
+    all_signal_items.extend(eo_items)
+
+    # 2. NewsAPI (optional — SSM key)
     news_headlines = []
     try:
-        ssm = boto3.client("ssm", region_name="us-east-1")
         param = ssm.get_parameter(Name=NEWSAPI_SSM_PATH, WithDecryption=True)
-        api_key = param["Parameter"]["Value"]
-        news_headlines = fetch_news_headlines(api_key)
+        news_items = fetch_news(param["Parameter"]["Value"])
+        all_signal_items.extend(news_items)
+        news_headlines = [
+            {"title": i["title"], "source": i["source"], "publishedAt": i["published"]}
+            for i in news_items
+        ]
     except Exception:
         pass
 
-    # LLM-driven predictions (graceful degradation — Bedrock failure = defaults)
+    # 3. X / Twitter (optional — SSM key)
+    tweet_items = []
     try:
-        predictions = get_llm_predictions(news_headlines) or DEFAULT_PREDICTIONS
+        param = ssm.get_parameter(Name=TWITTER_SSM_PATH, WithDecryption=True)
+        tweet_items = fetch_x_tweets(param["Parameter"]["Value"], max_results=50)
+        all_signal_items.extend(tweet_items)
+    except Exception:
+        pass
+
+    # ── Frequency model ──────────────────────────────────────────────────────
+    freq_result = compute_frequency_model(all_signal_items)
+    signals_section = format_signals_for_prompt(freq_result, all_signal_items)
+
+    # ── LLM predictions (graceful degradation) ───────────────────────────────
+    try:
+        predictions = get_llm_predictions(signals_section) or DEFAULT_PREDICTIONS
     except Exception:
         predictions = DEFAULT_PREDICTIONS
+
+    # ── Bayesian probability update using signal evidence ────────────────────
+    llm_probs = predictions.get("scenario_probs", DEFAULT_PREDICTIONS["scenario_probs"])
+    adjusted_probs = bayesian_update_probs(llm_probs, freq_result)
+
+    # Inject adjusted probs back into predictions (keep LLM tariff deltas)
+    predictions["scenario_probs"] = adjusted_probs
+    predictions["scenario_probs_llm_raw"] = llm_probs  # preserved for transparency
 
     cost_impacts = compute_cost_impacts(predictions)
 
@@ -287,13 +290,36 @@ def lambda_handler(event, context):
     deadline = datetime(2027, 3, 1, tzinfo=timezone.utc)
     deadline_days = max(0, (deadline - now).days)
 
+    # Build public top_signals list (strip internal scoring fields)
+    public_top_signals = [
+        {
+            "title": s["title"],
+            "source": s["source"],
+            "source_type": s["source_type"],
+            "published": s.get("published", ""),
+        }
+        for s in freq_result.get("top_signals", [])
+    ]
+
     payload = {
         "predictions": {
-            "scenario_probs": predictions.get("scenario_probs", DEFAULT_PREDICTIONS["scenario_probs"]),
+            "scenario_probs": adjusted_probs,
+            "scenario_probs_before_signals": llm_probs,
             "scenario_tariff_deltas": predictions.get(
                 "scenario_tariff_deltas", DEFAULT_PREDICTIONS["scenario_tariff_deltas"]
             ),
             "reasoning": predictions.get("reasoning", DEFAULT_PREDICTIONS["reasoning"]),
+        },
+        "signals": {
+            "signal_score": freq_result["signal_score"],
+            "sentiment": freq_result["sentiment"],
+            "velocity": freq_result["velocity"],
+            "source_counts": freq_result["source_counts"],
+            "top_signals": public_top_signals,
+            "escalation_mass": freq_result["escalation_mass"],
+            "deescalation_mass": freq_result["deescalation_mass"],
+            "total_items": freq_result["total_items"],
+            "bayesian_applied": True,
         },
         "policy_status": predictions.get("policy_status", DEFAULT_PREDICTIONS["policy_status"]),
         "alerts": predictions.get("alerts", DEFAULT_PREDICTIONS["alerts"]),

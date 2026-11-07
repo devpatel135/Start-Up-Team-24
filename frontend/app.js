@@ -58,6 +58,23 @@ const DEMO_DATA = {
   deadline_days: Math.max(0, Math.ceil((new Date(2027, 2, 1) - new Date()) / 86400000)),
   timestamp: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
   _isDemo: true,
+  signals: {
+    signal_score: 0.68,
+    sentiment: 0.42,
+    velocity: 'rising',
+    source_counts: { news: 14, tweet: 23, executive_order: 3 },
+    escalation_mass: 0.61,
+    deescalation_mass: 0.19,
+    total_items: 40,
+    bayesian_applied: true,
+    top_signals: [
+      { title: 'Executive Order 14257 — Section 301 Tariff Supplemental on Chinese Goods', source: 'Federal Register', source_type: 'executive_order', published: '2025-04-02' },
+      { title: 'Vietnam trade negotiators in D.C. as 90-day tariff pause approaches expiry', source: 'Reuters', source_type: 'news', published: '2025-07-01' },
+      { title: 'USTR announces formal review of Section 301 schedule — apparel category hearings set for September', source: 'WSJ', source_type: 'news', published: '2025-06-28' },
+      { title: 'China retaliatory measures expanded: US agricultural exports targeted', source: 'Financial Times', source_type: 'news', published: '2025-06-25' },
+      { title: '@SCOTUSblog: Federal Circuit declines to stay tariff EO enforcement pending appeal', source: 'Twitter/X', source_type: 'tweet', published: '2025-06-20' },
+    ],
+  },
 };
 
 const GAUGE_ARC_LENGTH = 219;
@@ -73,6 +90,7 @@ const RISK_CONFIG = {
 /* ── Module-level state ─────────────────────────────────────────────────────── */
 let _costImpacts = null;
 let _predictions = null;
+let _signals = null;
 
 /* ── Toast notifications ─────────────────────────────────────────────────────── */
 function showToast(message, type = 'info', duration = 4000) {
@@ -1138,6 +1156,7 @@ async function analyzeOrderCommitment() {
       predictions: _predictions || {},
       cost_impacts: _costImpacts || {},
       alerts: [],
+      signals: _signals || {},
       order_context: orderContext,
     };
 
@@ -1247,6 +1266,68 @@ function showError(section, message) {
   el.innerHTML = `<div class="error-state"><strong>Unable to load data</strong> — ${escapeHtml(message)}</div>`;
 }
 
+/* ── Signal Activity Panel ───────────────────────────────────────────────────── */
+function renderSignalPanel(signals) {
+  const panel = document.getElementById('signal-panel');
+  if (!panel || !signals || !signals.signal_score) return;
+
+  const score   = signals.signal_score || 0;
+  const sent    = signals.sentiment    || 0;
+  const vel     = (signals.velocity   || 'stable').toLowerCase();
+  const counts  = signals.source_counts || {};
+  const top     = signals.top_signals  || [];
+
+  // Score badge
+  const scoreEl = document.getElementById('signal-score-val');
+  if (scoreEl) scoreEl.textContent = Math.round(score * 100) + '%';
+
+  // Bar fill
+  const barEl = document.getElementById('signal-bar-fill');
+  if (barEl) barEl.style.width = Math.round(score * 100) + '%';
+
+  // Velocity chip
+  const velEl = document.getElementById('signal-velocity-val');
+  if (velEl) {
+    const icon = vel === 'rising' ? '↑' : vel === 'falling' ? '↓' : '→';
+    velEl.textContent = icon + ' ' + vel.charAt(0).toUpperCase() + vel.slice(1);
+    velEl.className = `signal-stat-val velocity-chip ${vel}`;
+  }
+
+  // Sentiment chip
+  const sentEl = document.getElementById('signal-sentiment-val');
+  if (sentEl) {
+    const sentClass = sent > 0.2 ? 'escalation' : sent < -0.2 ? 'deescalation' : 'neutral';
+    const sentLabel = sent > 0.2 ? 'Escalating' : sent < -0.2 ? 'De-escalating' : 'Neutral';
+    sentEl.textContent = sentLabel;
+    sentEl.className = `signal-stat-val sentiment-chip ${sentClass}`;
+  }
+
+  // Source counts
+  const newsEl   = document.getElementById('signal-count-news');
+  const tweetEl  = document.getElementById('signal-count-tweets');
+  const eoEl     = document.getElementById('signal-count-eo');
+  if (newsEl)  newsEl.textContent  = counts.news            || '0';
+  if (tweetEl) tweetEl.textContent = counts.tweet           || '0';
+  if (eoEl)    eoEl.textContent    = counts.executive_order || '0';
+
+  // Top signals list
+  const listEl = document.getElementById('signal-top-list');
+  if (listEl) {
+    if (top.length === 0) {
+      listEl.innerHTML = '<p class="signal-top-title" style="color:var(--text-muted);padding:8px 0">No signal items collected yet.</p>';
+    } else {
+      listEl.innerHTML = top.slice(0, 5).map(s => {
+        const typeClass = s.source_type === 'executive_order' ? 'eo' : s.source_type === 'tweet' ? 'tweet' : 'news';
+        const typeLabel = s.source_type === 'executive_order' ? 'EO' : s.source_type === 'tweet' ? 'X/Twitter' : 'News';
+        return `<div class="signal-top-item ${typeClass}">
+          <span class="signal-top-source">${escapeHtml(typeLabel)}</span>
+          <span class="signal-top-title">${escapeHtml(s.title || '')}</span>
+        </div>`;
+      }).join('');
+    }
+  }
+}
+
 function updateTimestamp(iso) {
   const el = document.getElementById('last-updated');
   const ft = document.getElementById('footer-ts');
@@ -1275,6 +1356,8 @@ async function loadDashboard() {
     showToast('Using demo data — connect AWS for live predictions', 'warn', 6000);
   }
 
+  _signals = tradeData.signals || null;
+
   renderFeaturedContracts(tradeData.predictions || {}, tradeData.cost_impacts || {});
   renderCategoryCards(tradeData.cost_impacts || {});
   makeCardsClickable();
@@ -1290,6 +1373,7 @@ async function loadDashboard() {
   renderCategoryChart(tradeData.cost_impacts || {});
   renderDecisionBanner(tradeData.predictions || {}, tradeData.cost_impacts || {});
   renderKPICards(tradeData.cost_impacts || {}, tradeData.predictions || {});
+  renderSignalPanel(_signals);
   updateTimestamp(tradeData.timestamp);
 
   // ── Step 1b: Set risk gauge immediately from prediction probabilities ────
@@ -1310,6 +1394,7 @@ async function loadDashboard() {
         predictions: tradeData.predictions || {},
         cost_impacts: tradeData.cost_impacts || {},
         alerts: tradeData.alerts || [],
+        signals: tradeData.signals || {},
       };
       const analyzeResp = await fetch(`${API_BASE}/analyze`, {
         method: 'POST',

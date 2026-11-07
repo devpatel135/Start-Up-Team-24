@@ -150,6 +150,57 @@
         </div>
       </section>
 
+      <!-- Signal Activity Panel -->
+      <section class="panel panel--signals" id="signal-panel" aria-labelledby="signals-heading">
+        <div class="signals-header">
+          <div>
+            <h2 id="signals-heading" class="section-label">Signal Activity</h2>
+            <p class="section-desc">Frequency-modeled probability signals from X/Twitter, news, and executive orders · Bayesian adjustment applied</p>
+          </div>
+          <div id="signal-score-badge" class="signal-score-badge">
+            <span class="signal-score-label">Intensity</span>
+            <span class="signal-score-val" id="signal-score-val">—</span>
+          </div>
+        </div>
+        <div class="signals-body" id="signals-body">
+          <div class="signals-meta-row">
+            <div class="signal-stat" id="signal-stat-velocity">
+              <span class="signal-stat-label">Velocity</span>
+              <span class="signal-stat-val" id="signal-velocity-val">—</span>
+            </div>
+            <div class="signal-stat" id="signal-stat-sentiment">
+              <span class="signal-stat-label">Sentiment</span>
+              <span class="signal-stat-val" id="signal-sentiment-val">—</span>
+            </div>
+            <div class="signal-stat">
+              <span class="signal-stat-label">News</span>
+              <span class="signal-stat-val" id="signal-count-news">—</span>
+            </div>
+            <div class="signal-stat">
+              <span class="signal-stat-label">Tweets</span>
+              <span class="signal-stat-val" id="signal-count-tweets">—</span>
+            </div>
+            <div class="signal-stat">
+              <span class="signal-stat-label">Exec. Orders</span>
+              <span class="signal-stat-val" id="signal-count-eo">—</span>
+            </div>
+          </div>
+          <div class="signal-bar-wrap">
+            <div class="signal-bar-track">
+              <div class="signal-bar-fill" id="signal-bar-fill" style="width:0%"></div>
+            </div>
+            <div class="signal-bar-labels">
+              <span>Quiet</span><span>Moderate</span><span>High</span><span>Very High</span>
+            </div>
+          </div>
+          <div class="signal-top-list" id="signal-top-list">
+            <div class="skeleton skeleton--rect" style="height:14px;margin-bottom:6px"></div>
+            <div class="skeleton skeleton--rect" style="height:14px;margin-bottom:6px;width:80%"></div>
+            <div class="skeleton skeleton--rect" style="height:14px;width:60%"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- Kalshi: Make a Call -->
       <section class="panel panel--call" aria-labelledby="call-heading">
         <h2 id="call-heading" class="section-label">Make a Trade Call</h2>
