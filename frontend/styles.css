@@ -1428,6 +1428,87 @@ a:hover { text-decoration: underline; }
   line-height: 1.65;
 }
 
+/* ── Order Commitment AI Analyze button ──────────────────────────────────────── */
+.oc-analyze-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 18px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+  justify-content: center;
+}
+.oc-analyze-btn:hover:not(:disabled) {
+  background: var(--accent-dark);
+  box-shadow: 0 4px 12px rgba(232,97,74,.30);
+}
+.oc-analyze-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* AI result card in the inputs pane */
+.oc-ai-card {
+  margin-top: 14px;
+  background: linear-gradient(135deg, rgba(232,97,74,.07) 0%, rgba(26,39,68,.04) 100%);
+  border: 1px solid rgba(232,97,74,.22);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+.oc-ai-card-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+  font-family: var(--font-mono);
+}
+.oc-ai-card-body {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.oc-ai-card-body strong {
+  color: var(--navy, var(--text));
+  font-weight: 700;
+}
+.oc-ai-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.oc-ai-loading .spinner {
+  width: 14px; height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ── Help / Methodology button ───────────────────────────────────────────────── */
 .help-btn {
   display: flex;

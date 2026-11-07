@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261107">
+  <link rel="stylesheet" href="styles.css?v=20261108">
   <script>window.API_BASE = '';</script>
 </head>
 <body>
@@ -356,7 +356,19 @@
                 <label class="pt-label" for="oc-budget">Season Budget ($)</label>
                 <input type="number" id="oc-budget" class="pt-input" placeholder="Optional total budget" min="0" step="1000">
               </div>
+              <div class="pt-field">
+                <label class="pt-label" for="oc-notes">Additional Context</label>
+                <textarea id="oc-notes" class="pt-input" rows="3" placeholder="e.g. Must commit by Dec 15. Supplier allows 60-day hold. Already hedged 20% via Vietnam…" style="resize:vertical; font-family:inherit; font-size:inherit;"></textarea>
+              </div>
             </div>
+            <button class="oc-analyze-btn" id="oc-analyze-btn" onclick="analyzeOrderCommitment()">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" aria-hidden="true" style="flex-shrink:0">
+                <circle cx="8" cy="8" r="6"/>
+                <path d="M8 5v3l2 1"/>
+              </svg>
+              Get AI Order Recommendation
+            </button>
+            <div id="oc-ai-result" style="display:none" aria-live="polite"></div>
           </div>
 
           <!-- Right: Results -->
@@ -393,6 +405,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <script src="app.js?v=20261107"></script>
+  <script src="app.js?v=20261108"></script>
 </body>
 </html>

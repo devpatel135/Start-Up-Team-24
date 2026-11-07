@@ -1084,6 +1084,150 @@ function updateOrderCommitmentResults() {
   `;
 }
 
+/* ── Order Commitment: AI LLM Analysis ───────────────────────────────────────── */
+async function analyzeOrderCommitment() {
+  const btn    = document.getElementById('oc-analyze-btn');
+  const aiEl   = document.getElementById('oc-ai-result');
+  if (!btn || !aiEl) return;
+
+  const cat       = document.getElementById('oc-category')?.value || 'basics';
+  const units     = parseFloat(document.getElementById('oc-units')?.value) || 500;
+  const unitCost  = parseFloat(document.getElementById('oc-cost')?.value) || 18;
+  const marginPct = parseFloat(document.getElementById('oc-margin')?.value) || 50;
+  const budgetRaw = parseFloat(document.getElementById('oc-budget')?.value);
+  const budget    = isNaN(budgetRaw) || budgetRaw <= 0 ? units * unitCost : budgetRaw;
+  const notes     = (document.getElementById('oc-notes')?.value || '').trim();
+  const catLabel  = CATEGORY_META[cat]?.label || cat;
+
+  btn.disabled = true;
+  aiEl.style.display = 'block';
+  aiEl.innerHTML = `
+    <div class="oc-ai-loading">
+      <div class="spinner"></div>
+      Sending to Claude on AWS Bedrock — analyzing your order…
+    </div>`;
+
+  try {
+    const impacts  = _costImpacts?.[cat] || { p10: 0, p50: 0, p90: 0 };
+    const probs    = _predictions?.scenario_probs || {};
+    const margin   = marginPct / 100;
+    const totalCOGS = units * unitCost;
+
+    const p50Impact = impacts.p50 || 0;
+    const p90Impact = impacts.p90 || 0;
+    const p50Erosion = (p50Impact * (1 - margin) * 100).toFixed(1);
+    const p90Erosion = (p90Impact * (1 - margin) * 100).toFixed(1);
+    const p50AddedCost = fmtMoney(units * unitCost * p50Impact);
+    const p90AddedCost = fmtMoney(units * unitCost * p90Impact);
+    const days = daysToDeadline();
+
+    const orderContext = [
+      `The buyer is analyzing a specific order commitment for the ${catLabel} category.`,
+      `Order details: ${units.toLocaleString()} units at ${fmtMoney(unitCost)} unit cost = ${fmtMoney(totalCOGS)} total COGS.`,
+      `Current retail margin: ${marginPct}%.`,
+      `Season budget: ${fmtMoney(budget)}.`,
+      `Days until Spring 2027 commitment deadline: ${days}.`,
+      `P50 tariff scenario (${Math.round((probs.p50 || 0)*100)}% probability): +${(p50Impact*100).toFixed(1)}% landed cost impact, ${p50Erosion}pp margin erosion, ${p50AddedCost} added cost.`,
+      `P90 tariff scenario (${Math.round((probs.p90 || 0)*100)}% probability): +${(p90Impact*100).toFixed(1)}% landed cost impact, ${p90Erosion}pp margin erosion, ${p90AddedCost} added cost.`,
+      notes ? `Buyer notes: ${notes}` : '',
+      `Please give a specific, actionable order commitment recommendation for this exact order. `,
+      `Include: (1) recommended absorb/pass-through strategy with rationale, (2) the expected margin impact under each strategy for P50 and P90 scenarios, (3) any sourcing or timing actions to take given the deadline, (4) one specific risk the buyer should monitor. Be concise and direct — this is a decision-support tool for a retail merchandise buyer.`,
+    ].filter(Boolean).join(' ');
+
+    const body = {
+      predictions: _predictions || {},
+      cost_impacts: _costImpacts || {},
+      alerts: [],
+      order_context: orderContext,
+    };
+
+    const resp = await fetch(`${API_BASE}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    const rawSummary = (data.summary || '').trim();
+    const displayText = (rawSummary && !rawSummary.startsWith('AI analysis temporarily'))
+      ? rawSummary
+      : buildFallbackOCRecommendation(cat, catLabel, units, unitCost, margin, marginPct, impacts, probs, budget, days, notes);
+
+    aiEl.innerHTML = `
+      <div class="oc-ai-card">
+        <div class="oc-ai-card-label">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12" aria-hidden="true">
+            <circle cx="8" cy="8" r="6"/>
+            <path d="M8 5v3l2 1"/>
+          </svg>
+          Claude AI · Order Recommendation
+        </div>
+        <div class="oc-ai-card-body">${escapeHtml(displayText)}</div>
+      </div>`;
+  } catch (err) {
+    console.warn('OC analyze failed:', err);
+    const fallback = buildFallbackOCRecommendation(
+      cat,
+      CATEGORY_META[cat]?.label || cat,
+      units, unitCost,
+      marginPct / 100, marginPct,
+      _costImpacts?.[cat] || { p10: 0, p50: 0, p90: 0 },
+      _predictions?.scenario_probs || {},
+      budget,
+      daysToDeadline(),
+      document.getElementById('oc-notes')?.value || ''
+    );
+    aiEl.innerHTML = `
+      <div class="oc-ai-card">
+        <div class="oc-ai-card-label">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12" aria-hidden="true">
+            <circle cx="8" cy="8" r="6"/>
+            <path d="M8 5v3l2 1"/>
+          </svg>
+          Recommendation (Offline Mode)
+        </div>
+        <div class="oc-ai-card-body">${escapeHtml(fallback)}</div>
+      </div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function buildFallbackOCRecommendation(cat, catLabel, units, unitCost, margin, marginPct, impacts, probs, budget, days, notes) {
+  const p50Impact  = impacts.p50 || 0;
+  const p90Impact  = impacts.p90 || 0;
+  const p50Erosion = (p50Impact * (1 - margin) * 100).toFixed(1);
+  const p90Erosion = (p90Impact * (1 - margin) * 100).toFixed(1);
+  const p50Split   = (p50Erosion / 2);
+  const totalCOGS  = units * unitCost;
+  const p50Added   = fmtMoney(units * unitCost * p50Impact);
+  const daysMsg    = days < 60 ? `With only ${days} days to deadline, time is limited.` : `You have ${days} days until the commitment deadline.`;
+  let strategy     = 'Full Absorb';
+  let rationale    = `P50 exposure of ${p50Erosion}pp is within the typical 2–3pp tolerance. Absorb and monitor.`;
+  if (parseFloat(p90Erosion) > 7) {
+    strategy  = '50/50 Split + Sourcing Diversification';
+    rationale = `P90 exposure of ${p90Erosion}pp is severe. Split 50% to Vietnam/Bangladesh alternatives and pass through the remaining half. This limits worst-case erosion to ${(p90Erosion / 2).toFixed(1)}pp while keeping retail price increases defensible.`;
+  } else if (parseFloat(p50Erosion) > 3.5) {
+    strategy  = '50/50 Split Strategy';
+    rationale = `P50 erosion of ${p50Erosion}pp exceeds tolerance. A 50/50 split limits margin impact to ${p50Split.toFixed(1)}pp while requiring a modest retail price increase — the most defensible position given documented tariff uncertainty.`;
+  }
+  return [
+    `Category: ${catLabel} | ${units.toLocaleString()} units @ ${fmtMoney(unitCost)} = ${fmtMoney(totalCOGS)} total COGS`,
+    ``,
+    `Recommended Strategy: ${strategy}`,
+    ``,
+    rationale,
+    ``,
+    `P50 scenario impact: +${(p50Impact*100).toFixed(1)}% landed cost → ${p50Erosion}pp margin erosion → ${p50Added} added cost`,
+    `P90 scenario impact: +${(p90Impact*100).toFixed(1)}% landed cost → ${p90Erosion}pp margin erosion`,
+    ``,
+    `${daysMsg} Secure supplier cost-escalation provisions before committing. Monitor Kalshi P90 probability — if it rises above 35%, accelerate Vietnam sourcing negotiations.`,
+    notes ? `\nBuyer note considered: ${notes}` : '',
+  ].filter(s => s !== null).join('\n');
+}
+
 /* ── Render: Summary ─────────────────────────────────────────────────────────── */
 function renderSummary(summaryText) {
   const el = document.getElementById('llm-summary');
