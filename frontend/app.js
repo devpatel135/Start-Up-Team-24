@@ -833,9 +833,37 @@ function renderRecommendations(recommendations) {
   const panel = document.getElementById('recommendations-panel');
   if (!panel || !recommendations || !recommendations.length) return;
 
-  panel.innerHTML = `<ol class="recommendations-list">${
-    recommendations.map(r => `<li class="rec-item">${escapeHtml(r)}</li>`).join('')
-  }</ol>`;
+  const PRIORITY_META = {
+    'URGENT':    { cls: 'rec-urgent',    icon: '⚡', desc: 'Act today' },
+    'THIS WEEK': { cls: 'rec-week',      icon: '📋', desc: 'Within 7 days' },
+    'MONITOR':   { cls: 'rec-monitor',   icon: '👁',  desc: 'Watch & wait' },
+  };
+
+  panel.innerHTML = recommendations.map((r, i) => {
+    // Accept either a plain string (legacy) or a structured object
+    if (typeof r === 'string') {
+      return `<div class="rec-card rec-week">
+        <div class="rec-card-left">
+          <div class="rec-index">${i + 1}</div>
+        </div>
+        <div class="rec-card-body">
+          <div class="rec-action">${escapeHtml(r)}</div>
+        </div>
+      </div>`;
+    }
+    const meta = PRIORITY_META[r.priority] || PRIORITY_META['MONITOR'];
+    return `<div class="rec-card ${meta.cls}">
+      <div class="rec-card-left">
+        <span class="rec-priority-badge ${meta.cls}">${escapeHtml(r.priority)}</span>
+        <span class="rec-priority-desc">${meta.desc}</span>
+      </div>
+      <div class="rec-card-body">
+        <div class="rec-action">${escapeHtml(r.action)}</div>
+        ${r.detail ? `<div class="rec-detail">${escapeHtml(r.detail)}</div>` : ''}
+        ${r.tag ? `<div class="rec-tag">${escapeHtml(r.tag)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 /* ── Render: Policy Tracker ──────────────────────────────────────────────────── */
@@ -1424,9 +1452,10 @@ async function loadDashboard() {
     renderSummary(generateFallbackAnalysis(tradeData.predictions, tradeData.cost_impacts));
     updateRiskMeter(riskLevel);
     renderRecommendations([
-      'Audit China-sourced inventory across all 6 categories and quantify P50 cost impact as a share of gross margin before committing.',
-      'Model Vietnam and Bangladesh orders under BOTH pause-active (10%) and pause-expired (46%/37%) scenarios — do not assume the pause renews.',
-      'Negotiate price-escalation provisions with suppliers tied to published tariff rate changes before signing Spring 2027 purchase orders.',
+      { priority: 'URGENT',    action: 'Lock Spring footwear & basics orders', detail: 'Footwear (68% China, P90 +9.6%) and Basics (72% China, P90 +8.5%) are highest-margin-at-risk. Commit before vendors adjust landed pricing.', tag: 'Footwear · Basics' },
+      { priority: 'THIS WEEK', action: 'Model Vietnam & Bangladesh under both pause scenarios', detail: 'Do not assume the 90-day pause renews. Run P50 and P90 cost models for both pause-active (10%) and pause-expired (46%/37%) before signing.', tag: 'Outerwear · Accessories' },
+      { priority: 'THIS WEEK', action: 'Negotiate tariff price-escalation clauses', detail: 'Add contractual provisions tied to published Federal Register tariff rates. Protects margin if rates move post-commitment.', tag: 'All Categories' },
+      { priority: 'MONITOR',   action: 'Track USMCA Mexico capacity for Denim & Activewear', detail: 'Mexico is the only fully-exempt (0%) major origin. Capacity is low-medium — verify lead times with 2 vendors this week.', tag: 'Denim · Activewear' },
     ]);
   }
 
@@ -1450,5 +1479,14 @@ document.addEventListener('DOMContentLoaded', () => {
   initMethodologyModal();
   initContractCall();
   renderDecisionBanner({}, null); // show deadline days immediately
+  // Pre-render signal panel and recommendations from demo data immediately
+  // so the UI is never empty while the API fetch is in flight
+  renderSignalPanel(DEMO_DATA.signals);
+  renderRecommendations([
+    { priority: 'URGENT', action: 'Lock Spring footwear & basics orders', detail: 'Footwear (68% China, P90 +9.6%) and Basics (72% China, P90 +8.5%) are highest-margin-at-risk. Commit before vendors adjust landed pricing.', tag: 'Footwear · Basics' },
+    { priority: 'THIS WEEK', action: 'Model Vietnam & Bangladesh under both pause scenarios', detail: 'Do not assume the 90-day pause renews. Run P50 and P90 cost models for both pause-active (10%) and pause-expired (46%/37%) before signing.', tag: 'Outerwear · Accessories' },
+    { priority: 'THIS WEEK', action: 'Negotiate tariff price-escalation clauses', detail: 'Add contractual provisions tied to published Federal Register tariff rates. Protects margin if rates move post-commitment.', tag: 'All Categories' },
+    { priority: 'MONITOR', action: 'Track USMCA Mexico capacity for Denim & Activewear', detail: 'Mexico is the only fully-exempt (0%) major origin. Capacity is low-medium — verify lead times and capacity with 2 vendors this week.', tag: 'Denim · Activewear' },
+  ]);
   loadDashboard();
 });
