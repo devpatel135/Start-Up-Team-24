@@ -1064,6 +1064,9 @@ a:hover { text-decoration: underline; }
 .pt-results-table tbody tr:last-child td { border-bottom: none; }
 .pt-results-table tbody tr:hover td { background: var(--surface-2); }
 
+/* Force absorb matrix to display as a real table (overrides display:block) */
+.absorb-matrix { display: table; }
+
 /* ── Decision Banner ─────────────────────────────────────────────────────────── */
 .db-bar {
   display: flex;
@@ -1590,6 +1593,15 @@ a:hover { text-decoration: underline; }
   letter-spacing: -0.04em;
   flex-shrink: 0;
   font-family: var(--font-body);
+}
+
+.brand-logo-svg {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  display: block;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.35));
 }
 
 .brand-divider {

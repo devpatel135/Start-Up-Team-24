@@ -1154,13 +1154,14 @@ async function loadDashboard() {
       if (!analyzeResp.ok) throw new Error(`HTTP ${analyzeResp.status}`);
       const analyzeData = await analyzeResp.json();
 
-      riskLevel = analyzeData.risk_level || 'unknown';
+      const aiRisk = analyzeData.risk_level;
+      riskLevel = ['low','moderate','high','severe'].includes(aiRisk) ? aiRisk : riskLevel;
       // If Bedrock fell back internally, generate a data-driven summary instead of the static placeholder
       const summaryText = (analyzeData.summary || '').startsWith('AI analysis temporarily')
         ? generateFallbackAnalysis(tradeData.predictions, tradeData.cost_impacts)
         : analyzeData.summary;
       renderSummary(summaryText);
-      updateRiskMeter(riskLevel);
+      if (['low','moderate','high','severe'].includes(aiRisk)) updateRiskMeter(riskLevel);
       renderRecommendations(analyzeData.recommendations || []);
     } catch (err) {
       console.warn('Analysis fetch failed:', err);
