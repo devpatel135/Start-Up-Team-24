@@ -980,36 +980,39 @@ function updateOrderCommitmentResults() {
     </table>
     </div>
 
-    <!-- Section 2: Absorb vs Pass-Through Decision Matrix -->
+    <!-- Section 2: Absorb vs Pass-Through Decision Matrix (horizontal: strategies as rows) -->
     <div class="oc-section-label">Decision Matrix — Absorb vs. Pass-Through</div>
     <p class="oc-section-desc">Choose your response strategy. Numbers assume ${marginPct}% current retail margin.</p>
     <div class="oc-table-wrap">
     <table class="pt-results-table absorb-matrix" role="table">
       <thead>
         <tr>
-          <th scope="col">Scenario</th>
-          <th scope="col">Full Absorb <span class="th-sub">0% price change</span></th>
-          <th scope="col">50/50 Split <span class="th-sub">partial pass-through</span></th>
-          <th scope="col">Full Pass-Through <span class="th-sub">margin protected</span></th>
+          <th scope="col">Strategy</th>
+          ${rows.map(r => `<th scope="col" style="color:${r.color}">${escapeHtml(r.label)}</th>`).join('')}
         </tr>
       </thead>
       <tbody>
-        ${rows.map(r => `
-          <tr>
-            <td style="color:${r.color};font-weight:600">${escapeHtml(r.label)}</td>
-            <td class="absorb-cell">
-              <span class="absorb-erosion" style="color:${ppColor(r.marginErosionPp)}">−${r.marginErosionPp.toFixed(1)}pp margin</span>
-              <span class="absorb-sub">${escapeHtml(fmtMoney(r.totalAddedCost))} absorbed</span>
-            </td>
-            <td class="absorb-cell">
-              <span class="absorb-erosion" style="color:${ppColor(r.marginErosionSplit)}">−${r.marginErosionSplit.toFixed(1)}pp margin</span>
-              <span class="absorb-sub">+${r.priceSplitPct.toFixed(1)}% retail price</span>
-            </td>
-            <td class="absorb-cell">
-              <span class="absorb-erosion" style="color:var(--low)">0pp margin erosion</span>
-              <span class="absorb-sub">+${r.priceIncreasePct.toFixed(1)}% retail price</span>
-            </td>
-          </tr>`).join('')}
+        <tr>
+          <td style="font-weight:600">Full Absorb <span class="th-sub">0% price change</span></td>
+          ${rows.map(r => `<td class="absorb-cell">
+            <span class="absorb-erosion" style="color:${ppColor(r.marginErosionPp)}">−${r.marginErosionPp.toFixed(1)}pp margin</span>
+            <span class="absorb-sub">${escapeHtml(fmtMoney(r.totalAddedCost))} absorbed</span>
+          </td>`).join('')}
+        </tr>
+        <tr>
+          <td style="font-weight:600">50/50 Split <span class="th-sub">partial pass-through</span></td>
+          ${rows.map(r => `<td class="absorb-cell">
+            <span class="absorb-erosion" style="color:${ppColor(r.marginErosionSplit)}">−${r.marginErosionSplit.toFixed(1)}pp margin</span>
+            <span class="absorb-sub">+${r.priceSplitPct.toFixed(1)}% retail price</span>
+          </td>`).join('')}
+        </tr>
+        <tr>
+          <td style="font-weight:600">Full Pass-Through <span class="th-sub">margin protected</span></td>
+          ${rows.map(r => `<td class="absorb-cell">
+            <span class="absorb-erosion" style="color:var(--low)">0pp margin erosion</span>
+            <span class="absorb-sub">+${r.priceIncreasePct.toFixed(1)}% retail price</span>
+          </td>`).join('')}
+        </tr>
       </tbody>
     </table>
     </div>
@@ -1123,6 +1126,16 @@ async function loadDashboard() {
   renderDecisionBanner(tradeData.predictions || {}, tradeData.cost_impacts || {});
   renderKPICards(tradeData.cost_impacts || {}, tradeData.predictions || {});
   updateTimestamp(tradeData.timestamp);
+
+  // ── Step 1b: Set risk gauge immediately from prediction probabilities ────
+  // Don't wait for the AI call — derive risk from p90 severity weight
+  {
+    const probs = (tradeData.predictions || {}).scenario_probs || {};
+    const p90 = probs.p90 || 0;
+    const p50 = probs.p50 || 0;
+    const immediateRisk = p90 >= 0.30 ? 'severe' : p90 >= 0.20 ? 'high' : p50 >= 0.50 ? 'moderate' : 'low';
+    updateRiskMeter(immediateRisk);
+  }
 
   // ── Step 2: LLM analysis via Bedrock Analyzer ────────────────────────────
   let riskLevel = 'unknown';
